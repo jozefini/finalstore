@@ -1,0 +1,5 @@
+{
+  "extends": "@store/tsconfig/react-library.json",
+  "include": [".", ".eslintrc.js"],
+  "exclude": ["dist", "node_modules"]
+}

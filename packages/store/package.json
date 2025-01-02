@@ -1,0 +1,46 @@
+{
+  "name": "finalstore",
+  "license": "MIT",
+  "version": "1.0.3",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf .turbo node_modules dist",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.9",
+    "@store/eslint-config": "workspace:*",
+    "@store/tsconfig": "workspace:*",
+    "@store/tsup-config": "workspace:*",
+    "@types/react": "^18.2.73",
+    "react": "^18.2.0",
+    "tsup": "8.2.4",
+    "typescript": "^4.5.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/jozefini/react-store",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jozefini/react-store.git"
+  },
+  "keywords": [
+    "react",
+    "store"
+  ]
+}
