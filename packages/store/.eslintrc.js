@@ -1,4 +1,4 @@
 module.exports = {
-	root: true,
-	extends: ['@store/eslint-config/base']
+  root: true,
+  extends: ['@finalstore/eslint-config/base']
 };

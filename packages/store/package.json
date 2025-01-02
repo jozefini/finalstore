@@ -23,9 +23,9 @@
   },
   "devDependencies": {
     "@types/node": "^20.8.9",
-    "@store/eslint-config": "workspace:*",
-    "@store/tsconfig": "workspace:*",
-    "@store/tsup-config": "workspace:*",
+    "@finalstore/eslint-config": "workspace:*",
+    "@finalstore/tsconfig": "workspace:*",
+    "@finalstore/tsup-config": "workspace:*",
     "@types/react": "^18.2.73",
     "react": "^18.2.0",
     "tsup": "8.2.4",
@@ -34,13 +34,14 @@
   "publishConfig": {
     "access": "public"
   },
-  "homepage": "https://github.com/jozefini/react-store",
+  "homepage": "https://github.com/jozefini/finalstore",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jozefini/react-store.git"
+    "url": "git+https://github.com/jozefini/finalstore.git"
   },
   "keywords": [
     "react",
+    "final",
     "store"
   ]
 }

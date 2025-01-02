@@ -7,14 +7,17 @@ const config = {
     '^(next/(.*)$)|^(next$)',
     '<THIRD_PARTY_MODULES>',
     '',
-    '^@store/(.*)$',
+    '^@finalstore/(.*)$',
     '',
     '^~/',
     '^[../]',
     '^[./]'
   ],
   importOrderTypeScriptVersion: '4.4.0',
-  plugins: ['@ianvs/prettier-plugin-sort-imports', 'prettier-plugin-tailwindcss']
+  plugins: [
+    '@ianvs/prettier-plugin-sort-imports',
+    'prettier-plugin-tailwindcss'
+  ]
 };
 
 module.exports = config;

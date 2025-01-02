@@ -1,5 +1,5 @@
 {
-  "name": "@store/tsup-config",
+  "name": "@finalstore/tsup-config",
   "version": "0.0.0",
   "private": true,
   "main": "index.js",

@@ -1,5 +1,5 @@
 {
-  "name": "@store/tsconfig",
+  "name": "@finalstore/tsconfig",
   "version": "0.0.2",
   "private": true,
   "files": [

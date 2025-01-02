@@ -1,6 +1,5 @@
+import { config } from '@finalstore/tsup-config';
 import { defineConfig } from 'tsup';
-
-import { config } from '@store/tsup-config';
 
 export default defineConfig((opts) => ({
   ...config,
