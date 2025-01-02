@@ -1,5 +1,11 @@
 # @devlab/store
 
+## 1.0.4
+
+### Patch Changes
+
+- Update alias namespace
+
 ## 1.0.3
 
 ### Patch Changes
