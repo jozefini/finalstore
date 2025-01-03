@@ -23,6 +23,10 @@ type CreateCollectionProps<States, Actions extends Record<string, unknown>> = {
     ) => void | Promise<void>;
   };
   initialMap?: Map<string, States>;
+  config?: {
+    devtools?: boolean;
+    name?: string;
+  };
 };
 
 type Subscriber<T> = {
@@ -78,6 +82,58 @@ export function createCollection<
 
   let states = new Map<string, States>(initialMap);
   const actions = props.actions;
+
+  // DevTools setup
+  let devTools: any = null;
+  let pauseDevTools = false;
+
+  // Setup DevTools if enabled
+  if (typeof window !== 'undefined' && props.config?.devtools) {
+    const devToolsExtension = (window as any).__REDUX_DEVTOOLS_EXTENSION__;
+    const devToolsName = props.config?.name || 'Collection';
+    if (devToolsExtension) {
+      devTools = devToolsExtension.connect({
+        name: devToolsName,
+        trace: true,
+        traceLimit: 25,
+        features: {
+          jump: true,
+          skip: true,
+          reorder: true,
+          dispatch: true,
+          persist: true
+        },
+        instanceId: devToolsName
+      });
+      // Convert Map to object for DevTools
+      const statesObject = Object.fromEntries(states);
+      devTools.init(statesObject);
+      devTools.subscribe((message: any) => {
+        if (message.type === 'DISPATCH') {
+          switch (message.payload.type) {
+            case 'JUMP_TO_ACTION':
+            case 'JUMP_TO_STATE':
+              try {
+                const newState = JSON.parse(message.state);
+                pauseDevTools = true;
+                // Convert object back to Map
+                states = new Map(Object.entries(newState));
+                notifyAllKeySubscribers();
+                notifySizeSubscribers();
+                notifyKeysSubscribers();
+                pauseDevTools = false;
+              } catch (error) {
+                console.error('Failed to parse jump state:', error);
+              }
+              break;
+            case 'RESET':
+              reset();
+              break;
+          }
+        }
+      });
+    }
+  }
 
   const subscribers: CollectionSubscribers<States> = {
     byKey: new Map(),
@@ -206,8 +262,16 @@ export function createCollection<
   function insert(key: string, state: States) {
     const hadKey = states.has(key);
     states.set(key, state);
-    notifyKeySubscribers(key);
 
+    // Send to DevTools
+    if (devTools && !pauseDevTools) {
+      devTools.send(
+        { type: 'INSERT', payload: { key, state } },
+        Object.fromEntries(states)
+      );
+    }
+
+    notifyKeySubscribers(key);
     if (!hadKey) {
       notifySizeSubscribers();
       notifyKeysSubscribers();
@@ -216,6 +280,15 @@ export function createCollection<
 
   function remove(key: string) {
     const hadKey = states.delete(key);
+
+    // Send to DevTools
+    if (devTools && !pauseDevTools) {
+      devTools.send(
+        { type: 'REMOVE', payload: { key } },
+        Object.fromEntries(states)
+      );
+    }
+
     if (hadKey) {
       notifyKeySubscribers(key);
       notifySizeSubscribers();
@@ -226,6 +299,11 @@ export function createCollection<
   function clear() {
     const wasEmpty = states.size === 0;
     states.clear();
+
+    // Send to DevTools
+    if (devTools && !pauseDevTools) {
+      devTools.send({ type: 'CLEAR' }, {});
+    }
 
     if (!wasEmpty) {
       notifyAllKeySubscribers();
@@ -240,6 +318,11 @@ export function createCollection<
 
     states.clear();
     states = new Map<string, States>(initialMap);
+
+    // Send to DevTools
+    if (devTools && !pauseDevTools) {
+      devTools.send({ type: 'RESET' }, Object.fromEntries(states));
+    }
 
     if (hadItems || hasInitialItems) {
       notifyAllKeySubscribers();
@@ -359,6 +442,14 @@ export function createCollection<
     }
 
     states.set(key, newState);
+
+    // Send to DevTools
+    if (devTools && !pauseDevTools) {
+      devTools.send(
+        { type: `${String(type)}@${key}`, payload },
+        Object.fromEntries(states)
+      );
+    }
 
     if (shouldNotify) {
       notifyKeySubscribers(key);
