@@ -13,6 +13,8 @@ import {
 // Types
 // =====================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyType = any;
 type CreateStoreProps<States, Actions extends Record<string, unknown>> = {
   states: States;
   config?: {
@@ -99,12 +101,12 @@ export function createStore<States, Actions extends Record<string, unknown>>(
   const actions = props.actions;
 
   // DevTools setup
-  let devTools: any = null;
+  let devTools: AnyType = null;
   let pauseDevTools = false;
 
   // Setup DevTools if enabled
   if (typeof window !== 'undefined' && props.config?.devtools) {
-    const devToolsExtension = (window as any).__REDUX_DEVTOOLS_EXTENSION__;
+    const devToolsExtension = (window as AnyType).__REDUX_DEVTOOLS_EXTENSION__;
     const devToolsName = props.config?.name || 'Store';
     if (devToolsExtension) {
       devTools = devToolsExtension.connect({
@@ -121,7 +123,7 @@ export function createStore<States, Actions extends Record<string, unknown>>(
         instanceId: devToolsName
       });
       devTools.init(states);
-      devTools.subscribe((message: any) => {
+      devTools.subscribe((message: AnyType) => {
         if (message.type === 'DISPATCH') {
           switch (message.payload.type) {
             case 'JUMP_TO_ACTION':

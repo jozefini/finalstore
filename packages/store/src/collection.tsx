@@ -15,6 +15,8 @@ import { isDeepEqual } from './store';
 // Types
 // =====================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyType = any;
 type CreateCollectionProps<States, Actions extends Record<string, unknown>> = {
   actions: {
     [K in keyof Actions]: (
@@ -84,12 +86,12 @@ export function createCollection<
   const actions = props.actions;
 
   // DevTools setup
-  let devTools: any = null;
+  let devTools: AnyType = null;
   let pauseDevTools = false;
 
   // Setup DevTools if enabled
   if (typeof window !== 'undefined' && props.config?.devtools) {
-    const devToolsExtension = (window as any).__REDUX_DEVTOOLS_EXTENSION__;
+    const devToolsExtension = (window as AnyType).__REDUX_DEVTOOLS_EXTENSION__;
     const devToolsName = props.config?.name || 'Collection';
     if (devToolsExtension) {
       devTools = devToolsExtension.connect({
@@ -108,7 +110,7 @@ export function createCollection<
       // Convert Map to object for DevTools
       const statesObject = Object.fromEntries(states);
       devTools.init(statesObject);
-      devTools.subscribe((message: any) => {
+      devTools.subscribe((message: AnyType) => {
         if (message.type === 'DISPATCH') {
           switch (message.payload.type) {
             case 'JUMP_TO_ACTION':
