@@ -15,6 +15,10 @@ import {
 
 type CreateStoreProps<States, Actions extends Record<string, unknown>> = {
   states: States;
+  config?: {
+    name?: string;
+    devtools?: boolean;
+  };
   actions: {
     [K in keyof Actions]: (
       state: States,
@@ -93,6 +97,53 @@ export function createStore<States, Actions extends Record<string, unknown>>(
   const initialStates = { ...props.states };
   let states = { ...initialStates };
   const actions = props.actions;
+
+  // DevTools setup
+  let devTools: any = null;
+  let pauseDevTools = false;
+
+  // Setup DevTools if enabled
+  if (typeof window !== 'undefined' && props.config?.devtools) {
+    const devToolsExtension = (window as any).__REDUX_DEVTOOLS_EXTENSION__;
+    const devToolsName = props.config?.name || 'Store';
+    if (devToolsExtension) {
+      devTools = devToolsExtension.connect({
+        name: devToolsName,
+        trace: true,
+        traceLimit: 25,
+        features: {
+          jump: true,
+          skip: true,
+          reorder: true,
+          dispatch: true,
+          persist: true
+        },
+        instanceId: devToolsName
+      });
+      devTools.init(states);
+      devTools.subscribe((message: any) => {
+        if (message.type === 'DISPATCH') {
+          switch (message.payload.type) {
+            case 'JUMP_TO_ACTION':
+            case 'JUMP_TO_STATE':
+              try {
+                const newState = JSON.parse(message.state);
+                pauseDevTools = true;
+                states = newState;
+                notify();
+                pauseDevTools = false;
+              } catch (error) {
+                console.error('Failed to parse jump state:', error);
+              }
+              break;
+            case 'RESET':
+              reset();
+              break;
+          }
+        }
+      });
+    }
+  }
 
   const subscribers = new Map<
     number,
@@ -204,6 +255,11 @@ export function createStore<States, Actions extends Record<string, unknown>>(
 
     states = newState;
 
+    // Send to DevTools
+    if (devTools && !pauseDevTools) {
+      devTools.send({ type: String(type), payload }, states);
+    }
+
     if (shouldNotify) {
       notify();
     }
@@ -212,6 +268,11 @@ export function createStore<States, Actions extends Record<string, unknown>>(
   function reset() {
     const prevStates = states;
     states = { ...initialStates };
+
+    // Send to DevTools
+    if (devTools && !pauseDevTools) {
+      devTools.send({ type: 'RESET' }, states);
+    }
 
     if (!isDeepEqual(prevStates, states)) {
       notify();
