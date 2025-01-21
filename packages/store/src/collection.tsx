@@ -14,6 +14,8 @@ import { isDeepEqual } from './store';
 // =====================
 // Type Helpers
 // =====================
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 type AnyType = any;
 type IsOptionalPayload<T> = unknown extends T
@@ -177,7 +179,10 @@ export function createCollection<
     }
 
     const keySubscribers = subscribers.byKey.get(key);
-    if (!keySubscribers) return () => {};
+    if (!keySubscribers)
+      return () => {
+        return null;
+      };
 
     const id = nextSubscriberId++;
     const initialSelector = selector || ((s: States) => s);
@@ -457,7 +462,7 @@ export function createCollection<
 
     const [payload, shouldNotify = true] = args;
     const newState = { ...state };
-    const result = cb(newState, payload as Actions[K]);
+    const result = cb(newState, payload ?? (undefined as Actions[K]));
 
     // Handle async actions
     if (result instanceof Promise) {
