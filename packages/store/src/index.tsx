@@ -1,6 +1,2 @@
-export { type CreateStore, createScopedStore, createStore } from './store';
-export {
-  type CreateCollection,
-  createCollection,
-  createScopedCollection
-} from './collection';
+export { createScopedStore, createStore } from './store';
+export { createCollection, createScopedCollection } from './collection';

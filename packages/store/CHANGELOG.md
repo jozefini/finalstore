@@ -1,5 +1,11 @@
 # @devlab/store
 
+## 1.0.6
+
+### Patch Changes
+
+- Fix type support
+
 ## 1.0.5
 
 ### Patch Changes

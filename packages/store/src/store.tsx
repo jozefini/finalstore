@@ -13,33 +13,68 @@ import {
 // Types
 // =====================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 type AnyType = any;
-type CreateStoreProps<States, Actions extends Record<string, unknown>> = {
-  states: States;
+type DevToolsMessage = {
+  type: string;
+  payload: {
+    type: string;
+  };
+  state?: string;
+};
+
+type DevTools = {
+  connect: (config: unknown) => DevTools;
+  init: (state: unknown) => void;
+  subscribe: (listener: (message: DevToolsMessage) => void) => void;
+  send: (action: unknown, state: unknown) => void;
+};
+
+// =====================
+// Type Helpers
+// =====================
+type IsOptionalPayload<T> = unknown extends T
+  ? true
+  : undefined extends T
+    ? true
+    : false;
+
+type ActionArgs<T> =
+  IsOptionalPayload<T> extends true
+    ? [payload?: T, shouldNotify?: boolean]
+    : [payload: T, shouldNotify?: boolean];
+
+// =====================
+// Store Types
+// =====================
+type ActionFunction<TState, TPayload = undefined> = (
+  state: TState,
+  payload: TPayload
+) => void | Promise<void>;
+
+type PayloadByAction<TStates, TActions> = {
+  [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
+    ? P
+    : never;
+};
+
+type InferStore<TStates, TActions> = {
+  dispatch: <K extends keyof TActions>(
+    type: K,
+    ...args: ActionArgs<PayloadByAction<TStates, TActions>[K]>
+  ) => Promise<void>;
+  use: <T>(selector: (state: TStates) => T) => T;
+  get: <T>(selector?: (state: TStates) => T) => T | TStates;
+  reset: () => void;
+};
+
+type CreateStoreProps<TStates, TActions> = {
+  states: TStates;
+  actions: TActions;
   config?: {
     name?: string;
     devtools?: boolean;
   };
-  actions: {
-    [K in keyof Actions]: (
-      state: States,
-      payload: Actions[K]
-    ) => void | Promise<void>;
-  };
-};
-export type CreateStore<States, Actions extends Record<string, unknown>> = {
-  use: {
-    (): States;
-    <T>(selector: (state: States) => T): T;
-    <T extends unknown[]>(selector: (state: States) => T): T;
-  };
-  get: {
-    (): States;
-    <T>(selector: (state: States) => T): T;
-  };
-  dispatch: <K extends keyof Actions>(type: K, payload: Actions[K]) => void;
-  reset: () => void;
 };
 
 // =====================
@@ -93,20 +128,24 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
 // Store
 // =====================
 
-export function createStore<States, Actions extends Record<string, unknown>>(
-  props: CreateStoreProps<States, Actions>
-) {
+export function createStore<
+  TStates,
+  TActions extends Record<string, ActionFunction<TStates, AnyType>>
+>(props: CreateStoreProps<TStates, TActions>): InferStore<TStates, TActions> {
   const initialStates = { ...props.states };
   let states = { ...initialStates };
   const actions = props.actions;
 
   // DevTools setup
-  let devTools: AnyType = null;
+  let devTools: DevTools | null = null;
   let pauseDevTools = false;
 
   // Setup DevTools if enabled
   if (typeof window !== 'undefined' && props.config?.devtools) {
-    const devToolsExtension = (window as AnyType).__REDUX_DEVTOOLS_EXTENSION__;
+    const w = window as unknown as {
+      __REDUX_DEVTOOLS_EXTENSION__?: DevTools;
+    };
+    const devToolsExtension = w.__REDUX_DEVTOOLS_EXTENSION__;
     const devToolsName = props.config?.name || 'Store';
     if (devToolsExtension) {
       devTools = devToolsExtension.connect({
@@ -122,14 +161,14 @@ export function createStore<States, Actions extends Record<string, unknown>>(
         },
         instanceId: devToolsName
       });
-      devTools.init(states);
-      devTools.subscribe((message: AnyType) => {
+      devTools?.init(states);
+      devTools?.subscribe((message) => {
         if (message.type === 'DISPATCH') {
           switch (message.payload.type) {
             case 'JUMP_TO_ACTION':
             case 'JUMP_TO_STATE':
               try {
-                const newState = JSON.parse(message.state);
+                const newState = JSON.parse(message.state || '{}');
                 pauseDevTools = true;
                 states = newState;
                 notify();
@@ -150,7 +189,7 @@ export function createStore<States, Actions extends Record<string, unknown>>(
   const subscribers = new Map<
     number,
     {
-      selector: (state: States) => unknown;
+      selector: (state: TStates) => unknown;
       callback: () => void;
       lastValue: unknown;
     }
@@ -163,10 +202,10 @@ export function createStore<States, Actions extends Record<string, unknown>>(
 
   function subscribe(
     callback: () => void,
-    selector?: (state: States) => unknown
+    selector?: (state: TStates) => unknown
   ) {
     const id = nextSubscriberId++;
-    const initialSelector = selector || ((s: States) => s);
+    const initialSelector = selector || ((s: TStates) => s);
     const initialValue = initialSelector(getState());
 
     subscribers.set(id, {
@@ -181,7 +220,8 @@ export function createStore<States, Actions extends Record<string, unknown>>(
   }
 
   function notify() {
-    subscribers.forEach((sub) => {
+    const subs = Array.from(subscribers.values());
+    for (const sub of subs) {
       const currentState = getState();
       const newValue = sub.selector(currentState);
 
@@ -189,16 +229,16 @@ export function createStore<States, Actions extends Record<string, unknown>>(
         sub.lastValue = newValue;
         sub.callback();
       }
-    });
+    }
   }
 
-  function use(): States;
-  function use<T>(selector: (state: States) => T): T;
-  function use<T extends unknown[]>(selector: (state: States) => T): T;
-  function use<T>(selector?: (state: States) => T): States | T {
+  function use(): TStates;
+  function use<T>(selector: (state: TStates) => T): T;
+  function use<T extends unknown[]>(selector: (state: TStates) => T): T;
+  function use<T>(selector?: (state: TStates) => T): TStates | T {
     const stateRef = useRef(getState());
     const selectorRef = useRef(selector);
-    const valueRef = useRef<T | States>(
+    const valueRef = useRef<T | TStates>(
       selector ? selector(getState()) : getState()
     );
 
@@ -232,22 +272,22 @@ export function createStore<States, Actions extends Record<string, unknown>>(
     return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot);
   }
 
-  function get(): States;
-  function get<T>(selector: (state: States) => T): T;
-  function get<T>(selector?: (state: States) => T): States | T {
+  function get(): TStates;
+  function get<T>(selector: (state: TStates) => T): T;
+  function get<T>(selector?: (state: TStates) => T): TStates | T {
     if (!selector) return getState();
     return selector(getState());
   }
 
-  async function dispatch<K extends keyof Actions>(
+  async function dispatch<K extends keyof TActions>(
     type: K,
-    payload: Actions[K],
-    shouldNotify = true
+    ...args: ActionArgs<PayloadByAction<TStates, TActions>[K]>
   ): Promise<void> {
     const cb = actions[type];
     if (typeof cb !== 'function') return;
 
     const newState = { ...states };
+    const [payload, shouldNotify = true] = args;
     const result = cb(newState, payload);
 
     // Handle async actions
@@ -294,28 +334,32 @@ export function createStore<States, Actions extends Record<string, unknown>>(
 // =====================
 
 export function createScopedStore<
-  States,
-  Actions extends Record<string, unknown>
->(props: CreateStoreProps<States, Actions>) {
-  const StoreContext = createContext<CreateStore<States, Actions> | null>(null);
+  TStates,
+  TActions extends Record<string, ActionFunction<TStates, unknown>>
+>(props: CreateStoreProps<TStates, TActions>) {
+  type StoreType = InferStore<TStates, TActions>;
+
+  const StoreContext = createContext<StoreType | null>(null);
+
   const Provider: FC<{ children: React.ReactNode }> = ({ children }) => {
-    // biome-ignore lint: ignore
-    const store = useMemo(() => createStore<States, Actions>(props), []);
+    const store = useMemo(() => createStore<TStates, TActions>(props), [props]);
     useEffect(() => {
       return () => {
         store.reset();
       };
-    }, []);
+    }, [store]);
+
     return (
       <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
     );
   };
-  function useStore(): CreateStore<States, Actions> {
+  function useStore(): StoreType {
     const context = useContext(StoreContext);
     if (!context) {
       throw new Error('useStore must be used within a StoreProvider');
     }
     return context;
   }
+
   return { Provider, useStore };
 }

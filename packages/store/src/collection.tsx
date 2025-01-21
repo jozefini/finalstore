@@ -12,19 +12,41 @@ import {
 import { isDeepEqual } from './store';
 
 // =====================
-// Types
+// Type Helpers
 // =====================
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 type AnyType = any;
-type CreateCollectionProps<States, Actions extends Record<string, unknown>> = {
+type IsOptionalPayload<T> = unknown extends T
+  ? true
+  : undefined extends T
+    ? true
+    : false;
+
+type ActionArgs<T> =
+  IsOptionalPayload<T> extends true
+    ? [payload?: T, shouldNotify?: boolean]
+    : [payload: T, shouldNotify?: boolean];
+
+// =====================
+// Collection Types
+// =====================
+type ActionFunction<TState, TPayload = undefined> = (
+  state: TState,
+  payload: TPayload
+) => void | Promise<void>;
+
+type PayloadByAction<TStates, TActions> = {
+  [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
+    ? P
+    : never;
+};
+
+type CreateCollectionProps<TStates, TActions> = {
+  states: TStates;
   actions: {
-    [K in keyof Actions]: (
-      state: States,
-      payload: Actions[K]
-    ) => void | Promise<void>;
+    [K in keyof TActions]: ActionFunction<TStates, TActions[K]>;
   };
-  initialMap?: Map<string, States>;
+  initialMap?: Map<string, TStates>;
   config?: {
     devtools?: boolean;
     name?: string;
@@ -43,30 +65,27 @@ type CollectionSubscribers<States> = {
   keys: Map<number, Subscriber<string[]>>;
 };
 
-export type CreateCollection<
-  States,
-  Actions extends Record<string, unknown>
-> = {
-  insert: (key: string, state: States) => void;
+type InferCollection<TStates, TActions> = {
+  insert: (key: string, state: TStates) => void;
   remove: (key: string) => void;
   clear: () => void;
   reset: () => void;
   use: {
-    (key: string): States | undefined;
-    <T>(key: string, selector: (state: States) => T): T;
+    (key: string): TStates | undefined;
+    <T>(key: string, selector: (state: TStates) => T): T;
   };
   useSize: () => number;
   useKeys: () => string[];
   get: {
-    (key: string): States | undefined;
-    <T>(key: string, selector: (state: States) => T): T;
+    (key: string): TStates | undefined;
+    <T>(key: string, selector: (state: TStates) => T): T;
   };
   getSize: () => number;
   getKeys: () => string[];
-  dispatch: <K extends keyof Actions>(
+  dispatch: <K extends keyof TActions>(
     key: string,
     type: K,
-    payload: Actions[K]
+    ...args: ActionArgs<TActions[K]>
   ) => Promise<void>;
 };
 
@@ -157,7 +176,9 @@ export function createCollection<
       subscribers.byKey.set(key, new Map());
     }
 
-    const keySubscribers = subscribers.byKey.get(key)!;
+    const keySubscribers = subscribers.byKey.get(key);
+    if (!keySubscribers) return () => {};
+
     const id = nextSubscriberId++;
     const initialSelector = selector || ((s: States) => s);
     const state = states.get(key);
@@ -213,11 +234,11 @@ export function createCollection<
   // =====================
 
   function notifyAllKeySubscribers() {
-    subscribers.byKey.forEach((keySubscribers) => {
-      keySubscribers.forEach((sub) => {
+    for (const keySubscribers of subscribers.byKey.values()) {
+      for (const sub of keySubscribers.values()) {
         sub.callback();
-      });
-    });
+      }
+    }
   }
 
   function notifyKeySubscribers(key: string) {
@@ -227,34 +248,34 @@ export function createCollection<
     const state = states.get(key);
     if (!state) return;
 
-    keySubscribers.forEach((sub) => {
+    for (const sub of keySubscribers.values()) {
       const newValue = sub.selector(state);
       if (!isDeepEqual(newValue, sub.lastValue)) {
         sub.lastValue = newValue;
         sub.callback();
       }
-    });
+    }
   }
 
   function notifySizeSubscribers() {
-    subscribers.size.forEach((sub) => {
+    for (const sub of subscribers.size.values()) {
       const newValue = states.size;
       if (newValue !== sub.lastValue) {
         sub.lastValue = newValue;
         sub.callback();
       }
-    });
+    }
   }
 
   function notifyKeysSubscribers() {
     const currentKeys = Array.from(states.keys());
-    subscribers.keys.forEach((sub) => {
+    for (const sub of subscribers.keys.values()) {
       const newKeys = currentKeys;
       if (!isDeepEqual(newKeys, sub.lastValue)) {
         sub.lastValue = newKeys;
         sub.callback();
       }
-    });
+    }
   }
 
   // =====================
@@ -427,16 +448,16 @@ export function createCollection<
   async function dispatch<K extends keyof Actions>(
     key: string,
     type: K,
-    payload: Actions[K],
-    shouldNotify = true
+    ...args: ActionArgs<Actions[K]>
   ): Promise<void> {
     const state = states.get(key);
     if (!state) return;
     const cb = actions[type];
     if (typeof cb !== 'function') return;
 
+    const [payload, shouldNotify = true] = args;
     const newState = { ...state };
-    const result = cb(newState, payload);
+    const result = cb(newState, payload as Actions[K]);
 
     // Handle async actions
     if (result instanceof Promise) {
@@ -481,21 +502,24 @@ export function createScopedCollection<
   States,
   Actions extends Record<string, unknown>
 >(props: CreateCollectionProps<States, Actions>) {
-  const StoreContext = createContext<CreateCollection<States, Actions> | null>(
+  const StoreContext = createContext<InferCollection<States, Actions> | null>(
     null
   );
   const Provider: FC<{ children: React.ReactNode }> = ({ children }) => {
-    const store = useMemo(() => createCollection<States, Actions>(props), []);
+    const store = useMemo(
+      () => createCollection<States, Actions>(props),
+      [props]
+    );
     useEffect(() => {
       return () => {
         store.reset();
       };
-    }, []);
+    }, [store]);
     return (
       <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
     );
   };
-  function useStore(): CreateCollection<States, Actions> {
+  function useStore(): InferCollection<States, Actions> {
     const context = useContext(StoreContext);
     if (!context) {
       throw new Error('useStore must be used within a StoreProvider');
