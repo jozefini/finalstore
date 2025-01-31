@@ -1,5 +1,9 @@
 {
-  "extends": "@finalstore/tsconfig/react-library.json",
-  "include": [".", ".eslintrc.js"],
-  "exclude": ["dist", "node_modules"]
+  "extends": "../../packages/config/tsconfig/react-library.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

@@ -1,4 +1,4 @@
-import {
+import React, {
   createContext,
   useCallback,
   useContext,
@@ -6,7 +6,8 @@ import {
   useMemo,
   useRef,
   useSyncExternalStore,
-  type FC
+  type FC,
+  type ReactNode
 } from 'react';
 
 import { isDeepEqual } from './store';
@@ -510,7 +511,7 @@ export function createScopedCollection<
   const StoreContext = createContext<InferCollection<States, Actions> | null>(
     null
   );
-  const Provider: FC<{ children: React.ReactNode }> = ({ children }) => {
+  const Provider: FC<{ children: ReactNode }> = ({ children }) => {
     const store = useMemo(
       () => createCollection<States, Actions>(props),
       [props]

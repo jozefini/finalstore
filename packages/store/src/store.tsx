@@ -1,4 +1,4 @@
-import {
+import React, {
   createContext,
   useCallback,
   useContext,
@@ -6,7 +6,8 @@ import {
   useMemo,
   useRef,
   useSyncExternalStore,
-  type FC
+  type FC,
+  type ReactNode
 } from 'react';
 
 // =====================
@@ -342,7 +343,7 @@ export function createScopedStore<
 
   const StoreContext = createContext<StoreType | null>(null);
 
-  const Provider: FC<{ children: React.ReactNode }> = ({ children }) => {
+  const Provider: FC<{ children: ReactNode }> = ({ children }) => {
     const store = useMemo(() => createStore<TStates, TActions>(props), [props]);
     useEffect(() => {
       return () => {
