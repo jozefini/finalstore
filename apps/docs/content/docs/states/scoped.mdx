@@ -1,0 +1,38 @@
+---
+title: Scoped
+---
+
+Scoped stores provide component-level state management through a Provider/Consumer pattern. This allows you to create isolated state instances for specific components or features, perfect for reusable UI components.
+
+```tsx
+const scopedStore = createScopedStore({
+  states: {
+    isOpen: false
+  },
+  actions: {
+    toggle: (state) => {
+      state.isOpen = !state.isOpen;
+    }
+  }
+});
+
+function Modal() {
+  return (
+    <scopedStore.Provider>
+      <ModalContent />
+    </scopedStore.Provider>
+  );
+}
+
+function ModalContent() {
+  const store = scopedStore.useStore();
+  const isOpen = store.use((state) => state.isOpen);
+
+  return (
+    <div>
+      {isOpen && <div>Modal Content</div>}
+      <button onClick={() => store.dispatch('toggle')}>Toggle</button>
+    </div>
+  );
+}
+```

@@ -1,0 +1,69 @@
+---
+title: States
+description: Lightweight state management for React with TypeScript support
+---
+
+## Installation
+
+```bash
+bun add finalstore
+```
+
+## Quick Start
+
+```tsx
+import { createStore } from 'finalstore';
+
+type User = {
+  name: string;
+  age: number;
+};
+
+// Create store
+const store = createStore({
+  states: {
+    count: 0,
+    user: null
+  } as {
+    count: number;
+    user: null | User;
+  },
+  actions: {
+    setCount: (state, payload: number) => {
+      state.count = payload;
+    },
+    setUser: (state, payload: User) => {
+      state.user = payload;
+    }
+  },
+  config: {
+    name: 'AppStore',
+    devtools: true
+  }
+});
+
+// Use in components
+function Counter() {
+  const count = store.use((state) => state.count); // Reactive value
+
+  return (
+    <button
+      onClick={() => {
+        const oldCount = store.get((state) => state.count); // Non-reactive value
+        store.dispatch('setCount', oldCount + 1); // Dispatch action
+      }}
+    >
+      Count: {count}
+    </button>
+  );
+}
+```
+
+## Key Features
+
+- Global & scoped state management
+- TypeScript-first
+- Redux DevTools support
+- Deep equality checks for performance
+- Sync/async actions
+- Selector-based subscriptions

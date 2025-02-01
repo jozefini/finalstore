@@ -1,0 +1,53 @@
+---
+title: use()
+---
+
+The `use()` hook enables reactive state management in React components. When the selected state values change, your component will automatically re-render with the latest data. It's the primary way to consume state in React components.
+
+```tsx
+import { createStore } from 'finalstore';
+
+const store = createStore({
+  states: {
+    count: 0,
+    user: null as { name: string } | null
+  },
+  actions: {
+    increment: (state) => {
+      state.count++;
+    }
+  }
+});
+```
+
+## Basic Usage
+
+```tsx
+function Counter() {
+  // Get entire state
+  const state = store.use();
+
+  // Get specific value (recommended)
+  const count = store.use((state) => state.count);
+
+  return <div>Count: {count}</div>;
+}
+```
+
+## Multiple Selectors
+
+```tsx
+function UserProfile() {
+  const { user, count } = store.use((state) => ({
+    user: state.user,
+    count: state.count
+  }));
+
+  return (
+    <div>
+      <p>User: {user?.name}</p>
+      <p>Count: {count}</p>
+    </div>
+  );
+}
+```

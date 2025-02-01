@@ -1,0 +1,48 @@
+---
+title: get()
+---
+
+The `get()` method allows you to retrieve the current state values synchronously from your store. You can access either the entire state object or select specific values using a selector function.
+
+```tsx
+import { createStore } from 'finalstore';
+
+const store = createStore({
+  states: {
+    count: 0,
+    user: null as { name: string } | null
+  },
+  actions: {
+    increment: (state) => {
+      state.count++;
+    }
+  }
+});
+```
+
+## Basic Usage
+
+```tsx
+function handleClick() {
+  // Get entire state
+  const state = store.get();
+  console.log('Current state:', state);
+
+  // Get specific value
+  const count = store.get((state) => state.count);
+  console.log('Current count:', count);
+}
+```
+
+## With Selectors
+
+```tsx
+function logUserData() {
+  const userData = store.get((state) => ({
+    name: state.user?.name,
+    count: state.count
+  }));
+
+  console.log('User data:', userData);
+}
+```

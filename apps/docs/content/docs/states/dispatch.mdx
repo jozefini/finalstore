@@ -1,0 +1,60 @@
+---
+title: dispatch()
+---
+
+The `dispatch()` method is used to trigger state updates through predefined actions. It supports both synchronous and asynchronous actions, and can optionally skip notifications to prevent unnecessary re-renders.
+
+```tsx
+import { createStore } from 'finalstore';
+
+const store = createStore({
+  states: {
+    count: 0,
+    user: null as { name: string } | null
+  },
+  actions: {
+    increment: (state) => {
+      state.count++
+    },
+    setUser: (state, payload: { name: string }) => {
+      state.user = payload;
+    },
+    async fetchUser: (state, id: string) => {
+      state.user = await api.getUser(id);
+    }
+  }
+});
+```
+
+## Basic Usage
+
+```tsx
+// Without payload
+store.dispatch('increment');
+
+// With payload
+store.dispatch('setUser', { name: 'John' });
+```
+
+## Async Actions
+
+```tsx
+async function loadUser(id: string) {
+  // Handles async actions automatically
+  await store.dispatch('fetchUser', id);
+  console.log(
+    'User loaded:',
+    store.get((s) => s.user)
+  );
+}
+```
+
+## Optional Notification
+
+```tsx
+// Skip notification (prevents re-renders)
+store.dispatch('increment', undefined, false);
+
+// With payload, skip notification (prevents re-renders)
+store.dispatch('setUser', { name: 'John' }, false);
+```

@@ -1,0 +1,14 @@
+{
+  "title": "States",
+  "pages": [
+    "------",
+    "---Basic Usage---",
+    "get",
+    "use",
+    "dispatch",
+    "reset",
+    "---Advanced Usage---",
+    "scoped",
+    "devtools"
+  ]
+}

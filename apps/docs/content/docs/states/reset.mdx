@@ -1,0 +1,56 @@
+---
+title: reset()
+---
+
+The `reset()` method returns the store to its initial state. This is useful for clearing all state changes, such as during cleanup or when needing to start fresh.
+
+```tsx
+import { createStore } from 'finalstore';
+
+const store = createStore({
+  states: {
+    count: 0,
+    user: null as { name: string } | null
+  },
+  actions: {
+    increment: (state) => {
+      state.count++;
+    },
+    setUser: (state, user: { name: string }) => {
+      state.user = user;
+    }
+  }
+});
+```
+
+## Basic Usage
+
+```tsx
+function ResetButton() {
+  return (
+    <button
+      onClick={() => {
+        store.reset();
+        console.log('Store reset to:', store.get());
+      }}
+    >
+      Reset Store
+    </button>
+  );
+}
+```
+
+## With Cleanup
+
+```tsx
+function CleanupExample() {
+  React.useEffect(() => {
+    // Cleanup on unmount
+    return () => {
+      store.reset();
+    };
+  }, []);
+
+  return <div>Component with cleanup</div>;
+}
+```
