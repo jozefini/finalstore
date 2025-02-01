@@ -1,11 +1,5 @@
 # @finalstore/tsconfig
 
-## 0.0.3
-
-### Patch Changes
-
-- Update alias namespace
-
 ## 0.0.2
 
 ### Patch Changes

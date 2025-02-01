@@ -34,14 +34,13 @@
   "publishConfig": {
     "access": "public"
   },
-  "homepage": "https://github.com/jozefini/finalstore",
+  "homepage": "https://github.com/jozefini/react-store",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jozefini/finalstore.git"
+    "url": "git+https://github.com/jozefini/react-store.git"
   },
   "keywords": [
     "react",
-    "final",
     "store"
   ]
 }
