@@ -1,5 +1,6 @@
 ---
 title: dispatch()
+icon: Parentheses
 ---
 
 The `dispatch()` method is used to trigger state updates through predefined actions. It supports both synchronous and asynchronous actions, and can optionally skip notifications to prevent unnecessary re-renders.
@@ -14,12 +15,12 @@ const store = createStore({
   },
   actions: {
     increment: (state) => {
-      state.count++
+      state.count++;
     },
     setUser: (state, payload: { name: string }) => {
       state.user = payload;
     },
-    async fetchUser: (state, id: string) => {
+    fetchUser: (state, id: string) => {
       state.user = await api.getUser(id);
     }
   }

@@ -1,5 +1,6 @@
 ---
 title: insert()
+icon: Parentheses
 ---
 
 The `insert()` method allows you to add or update items in your collection. Each item is identified by a unique key and follows the state structure defined when creating the collection.
@@ -28,11 +29,7 @@ users.insert('user-1', {
 });
 
 // Update existing user
-users.insert('user-1', {
-  name: 'John Smith',
-  age: 26,
-  active: true
-});
+users.dispatch('user-1', 'updateName', 'John Smith');
 
 function UserList() {
   const size = users.useSize();

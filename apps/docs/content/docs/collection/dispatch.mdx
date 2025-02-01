@@ -1,5 +1,6 @@
 ---
 title: dispatch()
+icon: Parentheses
 ---
 
 The `dispatch()` method triggers actions to update a specific item in your collection. It supports both synchronous and asynchronous actions, and can optionally skip notifications to prevent unnecessary re-renders.
@@ -20,7 +21,7 @@ const users = createCollection({
     toggleActive: (state) => {
       state.active = !state.active;
     },
-    async fetchUserData: (state, userId: string) => {
+    fetchUserData: (state, userId: string) => {
       const data = await api.fetchUser(userId);
       state.name = data.name;
       state.age = data.age;
