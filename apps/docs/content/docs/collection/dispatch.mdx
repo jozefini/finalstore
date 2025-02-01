@@ -1,0 +1,42 @@
+---
+title: dispatch()
+---
+
+The `dispatch()` method triggers actions to update a specific item in your collection. It supports both synchronous and asynchronous actions, and can optionally skip notifications to prevent unnecessary re-renders.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    },
+    toggleActive: (state) => {
+      state.active = !state.active;
+    },
+    async fetchUserData: (state, userId: string) => {
+      const data = await api.fetchUser(userId);
+      state.name = data.name;
+      state.age = data.age;
+    }
+  }
+});
+
+// Basic usage
+users.dispatch('user-1', 'updateName', 'John Doe');
+
+// Without payload
+users.dispatch('user-1', 'toggleActive');
+
+// With async action
+await users.dispatch('user-1', 'fetchUserData', 'user-1');
+
+// Skip notification (prevents re-renders)
+users.dispatch('user-1', 'updateName', 'John Smith', false);
+```

@@ -1,0 +1,39 @@
+---
+title: useKeys()
+---
+
+The `useKeys()` hook subscribes to changes in the collection keys. Your component will re-render whenever items are added or removed, providing an up-to-date list of all item keys in the collection.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  }
+});
+
+function UserList() {
+  const userIds = users.useKeys();
+
+  return (
+    <div>
+      <h2>User List</h2>
+      <ul>
+        {userIds.map((userId) => (
+          <li key={userId}>
+            <UserProfile userId={userId} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```

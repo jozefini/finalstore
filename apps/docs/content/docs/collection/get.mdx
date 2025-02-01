@@ -1,0 +1,31 @@
+---
+title: get()
+---
+
+The `get()` method retrieves a specific item from your collection by its key. You can either get the entire item state or use a selector to extract specific values. This method is synchronous and ideal for accessing collection data outside of React components.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  }
+});
+
+// Add some user
+users.insert('user-1', { name: 'John', age: 25, active: true });
+
+// Get specific item
+const user = users.get('user-1');
+
+// Get with selector
+const name = users.get('user-1', (state) => state.name);
+```

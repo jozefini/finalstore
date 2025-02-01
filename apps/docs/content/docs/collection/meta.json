@@ -1,0 +1,16 @@
+{
+  "title": "Collection",
+  "pages": [
+    "------",
+    "insert",
+    "get",
+    "getSize",
+    "getKeys",
+    "use",
+    "useSize",
+    "useKeys",
+    "remove",
+    "reset",
+    "clear"
+  ]
+}

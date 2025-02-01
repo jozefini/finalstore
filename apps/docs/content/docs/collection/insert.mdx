@@ -1,0 +1,59 @@
+---
+title: insert()
+---
+
+The `insert()` method allows you to add or update items in your collection. Each item is identified by a unique key and follows the state structure defined when creating the collection.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  }
+});
+
+// Add new user
+users.insert('user-1', {
+  name: 'John Doe',
+  age: 25,
+  active: true
+});
+
+// Update existing user
+users.insert('user-1', {
+  name: 'John Smith',
+  age: 26,
+  active: true
+});
+
+function UserList() {
+  const size = users.useSize();
+  const keys = users.useKeys();
+
+  return (
+    <div>
+      <p>Total Users: {size}</p>
+      <button
+        onClick={() => {
+          const id = `user-${size + 1}`;
+          users.insert(id, {
+            name: 'New User',
+            age: 0,
+            active: true
+          });
+        }}
+      >
+        Add User
+      </button>
+    </div>
+  );
+}
+```

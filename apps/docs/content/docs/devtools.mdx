@@ -1,0 +1,70 @@
+---
+title: DevTools
+---
+
+Redux DevTools integration provides powerful debugging capabilities. With DevTools enabled, you can inspect state changes, time-travel through actions, and debug your application's state management in real-time.
+
+## Store Configuration
+
+```tsx
+import { createStore } from 'finalstore';
+
+const store = createStore({
+  states: {
+    count: 0,
+    user: null as { name: string } | null
+  },
+  actions: {
+    increment: (state) => {
+      state.count++;
+    },
+    setUser: (state, user: { name: string }) => {
+      state.user = user;
+    }
+  },
+  config: {
+    name: 'AppStore', // Name in DevTools
+    devtools: true // Enable DevTools
+  }
+});
+```
+
+## Collection Configuration
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    },
+    toggleActive: (state) => {
+      state.active = !state.active;
+    }
+  },
+  config: {
+    name: 'Users', // Name in DevTools
+    devtools: true // Enable DevTools
+  }
+});
+
+// Actions will be tracked in Redux DevTools
+users.insert('user-1', { name: 'John', age: 25, active: true });
+users.dispatch('user-1', 'updateName', 'John Doe');
+users.dispatch('user-1', 'toggleActive');
+users.remove('user-1');
+```
+
+Features available in DevTools:
+
+- Time-travel debugging
+- Action history with payloads
+- State inspection
+- Import/Export state
+- Action replay

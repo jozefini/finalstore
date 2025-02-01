@@ -1,0 +1,138 @@
+---
+title: Scoped Stores
+---
+
+Scoped state provides component-level state management through a Provider/Consumer pattern. This allows you to create isolated state instances for specific components or features.
+
+## Scoped Store
+
+```tsx
+import { createScopedStore } from 'finalstore';
+
+const modal = createScopedStore({
+  states: {
+    isOpen: false,
+    title: ''
+  },
+  actions: {
+    toggle: (state) => {
+      state.isOpen = !state.isOpen;
+    },
+    setTitle: (state, title: string) => {
+      state.title = title;
+    }
+  }
+});
+
+function Modal() {
+  return (
+    <modal.Provider>
+      <ModalContent />
+    </modal.Provider>
+  );
+}
+
+function ModalContent() {
+  const store = modal.useStore();
+  const isOpen = store.use((state) => state.isOpen);
+  const title = store.use((state) => state.title);
+
+  return (
+    <div>
+      {isOpen && (
+        <div>
+          <h2>{title}</h2>
+          <div>Modal Content</div>
+        </div>
+      )}
+      <button onClick={() => store.dispatch('toggle')}>Toggle</button>
+    </div>
+  );
+}
+```
+
+## Scoped Collection
+
+```tsx
+import { createScopedCollection } from 'finalstore';
+
+const todoList = createScopedCollection({
+  states: {
+    text: '',
+    completed: false
+  },
+  actions: {
+    toggle: (state) => {
+      state.completed = !state.completed;
+    },
+    setText: (state, text: string) => {
+      state.text = text;
+    }
+  }
+});
+
+function TodoList() {
+  return (
+    <todoList.Provider>
+      <AddTodo />
+      <TodoItems />
+    </todoList.Provider>
+  );
+}
+
+function AddTodo() {
+  const collection = todoList.useStore();
+  const size = collection.useSize();
+
+  return (
+    <button
+      onClick={() => {
+        collection.insert(`todo-${size + 1}`, {
+          text: 'New Todo',
+          completed: false
+        });
+      }}
+    >
+      Add Todo
+    </button>
+  );
+}
+
+function TodoItems() {
+  const collection = todoList.useStore();
+  const todoIds = collection.useKeys();
+
+  return (
+    <ul>
+      {todoIds.map((id) => (
+        <TodoItem key={id} id={id} />
+      ))}
+    </ul>
+  );
+}
+
+function TodoItem({ id }: { id: string }) {
+  const collection = todoList.useStore();
+  const todo = collection.use(id);
+
+  if (!todo) return null;
+
+  return (
+    <li>
+      <input
+        type="checkbox"
+        checked={todo.completed}
+        onChange={() => collection.dispatch(id, 'toggle')}
+      />
+      <span>{todo.text}</span>
+    </li>
+  );
+}
+```
+
+Both scoped stores and collections:
+
+- Create isolated state instances per component
+- Manage their own state independently
+- Reset automatically when unmounted
+- Perfect for reusable components

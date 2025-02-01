@@ -1,0 +1,44 @@
+---
+title: useSize()
+---
+
+The `useSize()` hook subscribes to changes in the collection size. Your component will automatically re-render whenever items are added or removed from the collection.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  }
+});
+
+function UserStats() {
+  const size = users.useSize();
+
+  return (
+    <div>
+      <h2>User Statistics</h2>
+      <p>Total Users: {size}</p>
+      <button
+        onClick={() => {
+          users.insert(`user-${size + 1}`, {
+            name: 'New User',
+            age: 0,
+            active: true
+          });
+        }}
+      >
+        Add User
+      </button>
+    </div>
+  );
+}
+```

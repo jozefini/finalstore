@@ -1,0 +1,94 @@
+---
+title: Collection
+description: Efficient collection state management for React with TypeScript support
+---
+
+## Quick Start
+
+```tsx
+import { createCollection } from 'finalstore';
+
+type User = {
+  name: string;
+  age: number;
+  active: boolean;
+};
+
+// Create collection
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  } as User,
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    },
+    toggleActive: (state) => {
+      state.active = !state.active;
+    }
+  },
+  config: {
+    name: 'Users',
+    devtools: true
+  }
+});
+
+// Use in components
+function UserList() {
+  const userIds = users.useKeys(); // Get all user IDs
+  const totalUsers = users.useSize(); // Get collection size
+
+  return (
+    <div>
+      <h2>Users ({totalUsers})</h2>
+      <button
+        onClick={() => {
+          users.insert(`user-${totalUsers + 1}`, {
+            name: 'New User',
+            age: 0,
+            active: true
+          });
+        }}
+      >
+        Add User
+      </button>
+      <ul>
+        {userIds.map((id) => (
+          <UserItem key={id} id={id} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function UserItem({ id }: { id: string }) {
+  const user = users.use(id); // Subscribe to specific user
+
+  if (!user) return null;
+
+  return (
+    <li>
+      <input
+        type="checkbox"
+        checked={user.active}
+        onChange={() => users.dispatch(id, 'toggleActive')}
+      />
+      <span>{user.name}</span>
+      <button onClick={() => users.remove(id)}>Delete</button>
+    </li>
+  );
+}
+```
+
+## Key Features
+
+- Map-based collection management
+- Individual item subscriptions
+- Collection size and keys tracking
+- TypeScript-first
+- Redux DevTools support
+- Deep equality checks for performance
+- Sync/async actions
+- Scoped collections for component isolation

@@ -1,0 +1,44 @@
+---
+title: remove()
+---
+
+The `remove()` method deletes a specific item from your collection by its key. This operation triggers updates to collection size and keys.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  }
+});
+
+function UserList() {
+  const userIds = users.useKeys();
+
+  return (
+    <div>
+      <ul>
+        {userIds.map((userId) => (
+          <li key={userId}>
+            <button
+              onClick={() => {
+                users.remove(userId);
+              }}
+            >
+              Delete User
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```

@@ -1,0 +1,41 @@
+---
+title: reset()
+---
+
+The `reset()` method returns the collection to its initial state. If an initial map was provided during creation, it will restore those values; otherwise, it will clear all items.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const initialUsers = new Map([
+  ['user-1', { name: 'John', age: 25, active: true }],
+  ['user-2', { name: 'Jane', age: 30, active: true }]
+]);
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  },
+  initialMap: initialUsers
+});
+
+function ResetButton() {
+  return (
+    <button
+      onClick={() => {
+        users.reset();
+        console.log('Collection reset to:', users.getSize()); // Output: 2
+      }}
+    >
+      Reset Collection
+    </button>
+  );
+}
+```

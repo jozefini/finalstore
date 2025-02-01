@@ -1,0 +1,37 @@
+---
+title: use()
+---
+
+The `use()` hook subscribes to changes of a specific item in your collection. When the item's state changes, your component will automatically re-render. You can subscribe to the entire item state or use a selector for specific values.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  }
+});
+
+function UserProfile({ userId }: { userId: string }) {
+  // Get specific item
+  const user = users.use(userId);
+
+  // Get with selector (recommended)
+  const name = users.use(userId, (state) => state.name);
+
+  return (
+    <div>
+      <p>Name: {name}</p>
+      {user && <p>Age: {user.age}</p>}
+    </div>
+  );
+}
+```

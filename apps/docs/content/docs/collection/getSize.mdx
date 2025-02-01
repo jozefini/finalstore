@@ -1,0 +1,34 @@
+---
+title: getSize()
+---
+
+The `getSize()` method returns the current number of items in your collection synchronously. This is useful when you need to check the collection size outside of React components.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  }
+});
+
+// Add some users
+users.insert('user-1', { name: 'John', age: 25, active: true });
+users.insert('user-2', { name: 'Jane', age: 30, active: true });
+
+// Get total number of users
+const totalUsers = users.getSize();
+console.log('Total users:', totalUsers); // Output: 2
+
+// Check if collection is empty
+const isEmpty = users.getSize() === 0;
+console.log('Is collection empty?', isEmpty); // Output: false
+```

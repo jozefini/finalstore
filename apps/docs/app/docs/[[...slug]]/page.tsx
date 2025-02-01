@@ -1,12 +1,12 @@
+import { notFound } from 'next/navigation';
 import { source } from '@/lib/source';
+import defaultMdxComponents from 'fumadocs-ui/mdx';
 import {
-  DocsPage,
   DocsBody,
   DocsDescription,
-  DocsTitle,
+  DocsPage,
+  DocsTitle
 } from 'fumadocs-ui/page';
-import { notFound } from 'next/navigation';
-import defaultMdxComponents from 'fumadocs-ui/mdx';
 
 export default async function Page(props: {
   params: Promise<{ slug?: string[] }>;
@@ -41,6 +41,6 @@ export async function generateMetadata(props: {
 
   return {
     title: page.data.title,
-    description: page.data.description,
+    description: page.data.description
   };
 }

@@ -1,0 +1,36 @@
+---
+title: getKeys()
+---
+
+The `getKeys()` method returns an array of all item keys in your collection synchronously. This is helpful when you need to iterate over or check the existence of specific items.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {
+    updateName: (state, name: string) => {
+      state.name = name;
+    }
+  }
+});
+
+// Add some users
+users.insert('user-1', { name: 'John', age: 25, active: true });
+users.insert('user-2', { name: 'Jane', age: 30, active: true });
+
+// Get all user IDs
+const userIds = users.getKeys();
+console.log('User IDs:', userIds); // Output: ['user-1', 'user-2']
+
+// Iterate over all users
+users.getKeys().forEach((userId) => {
+  const user = users.get(userId);
+  console.log(`User ${userId}:`, user);
+});
+```
