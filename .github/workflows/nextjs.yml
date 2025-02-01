@@ -62,7 +62,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: ${{ steps.detect-package-manager.outputs.manager }}
+          cache: ${{ steps.detect-package-manager.outputs.manager == 'bun' && '' || steps.detect-package-manager.outputs.manager }}
+      - name: Setup Bun cache
+        if: steps.detect-package-manager.outputs.manager == 'bun'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            .next/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}-
+            ${{ runner.os }}-bun-
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
