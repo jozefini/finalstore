@@ -1,12 +1,12 @@
 import {
   createContext,
+  createElement,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useSyncExternalStore,
-  type FC,
   type ReactNode
 } from 'react';
 
@@ -511,7 +511,7 @@ export function createScopedCollection<
   const StoreContext = createContext<InferCollection<States, Actions> | null>(
     null
   );
-  const Provider: FC<{ children: ReactNode }> = ({ children }) => {
+  const Provider = ({ children }: { children: ReactNode }) => {
     const store = useMemo(
       () => createCollection<States, Actions>(props),
       [props]
@@ -521,9 +521,7 @@ export function createScopedCollection<
         store.reset();
       };
     }, [store]);
-    return (
-      <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
-    );
+    return createElement(StoreContext.Provider, { value: store }, children);
   };
   function useStore(): InferCollection<States, Actions> {
     const context = useContext(StoreContext);
