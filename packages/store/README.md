@@ -2,12 +2,6 @@
 
 Intuitive state management for React applications with first-class TypeScript support. It offers both global stores and collection management with minimal boilerplate.
 
-## Installation
-
-```bash
-npm i finalstore
-```
-
 ## Quick Example
 
 ### Store Example

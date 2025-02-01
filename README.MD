@@ -5,7 +5,17 @@ Intuitive state management for React applications with first-class TypeScript su
 ## Installation
 
 ```bash
+# npm
 npm i finalstore
+
+# pnpm
+pnpm add finalstore
+
+# yarn
+yarn add finalstore
+
+# bun
+bun add finalstore
 ```
 
 ## Quick Example
