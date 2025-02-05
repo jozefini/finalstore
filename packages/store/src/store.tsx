@@ -98,6 +98,14 @@ type InferStore<
   get: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
+    <K extends keyof TSelectors>(
+      key: K,
+      ...args: TSelectors[K] extends SelectorFunction<TStates, any, infer P>
+        ? ActionArgs<P>
+        : never
+    ): TSelectors[K] extends SelectorFunction<TStates, infer R, any>
+      ? R
+      : never;
   };
   reset: () => void;
 } & (TSelectors extends Record<string, SelectorFunction<TStates, any, any>>
@@ -315,9 +323,28 @@ export function createStore<
 
   function get(): TStates;
   function get<T>(selector: (state: TStates) => T): T;
-  function get<T>(selector?: (state: TStates) => T): TStates | T {
-    if (!selector) return getState();
-    return selector(getState());
+  function get<K extends keyof TSelectors>(
+    key: K,
+    ...args: TSelectors[K] extends SelectorFunction<TStates, any, infer P>
+      ? ActionArgs<P>
+      : never
+  ): TSelectors[K] extends SelectorFunction<TStates, infer R, any> ? R : never;
+  function get(
+    selectorOrKey?: ((state: TStates) => any) | keyof TSelectors,
+    ...args: any[]
+  ): any {
+    if (typeof selectorOrKey === 'undefined') {
+      return getState();
+    }
+    if (typeof selectorOrKey === 'function') {
+      return selectorOrKey(getState());
+    }
+    const selector = props.selectors?.[selectorOrKey];
+    if (!selector) {
+      throw new Error(`Selector "${String(selectorOrKey)}" not found`);
+    }
+    const [payload] = args;
+    return selector(getState(), payload);
   }
 
   async function dispatch<K extends keyof TActions>(
