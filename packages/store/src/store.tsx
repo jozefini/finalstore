@@ -98,19 +98,11 @@ type InferStore<
   get: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
-    <K extends keyof TSelectors>(
-      key: K,
-      ...args: TSelectors[K] extends SelectorFunction<TStates, any, infer P>
-        ? ActionArgs<P>
-        : never
-    ): TSelectors[K] extends SelectorFunction<TStates, infer R, any>
-      ? R
-      : never;
   };
   reset: () => void;
 } & (TSelectors extends Record<string, SelectorFunction<TStates, any, any>>
   ? {
-      select: <K extends keyof TSelectors>(
+      selector: <K extends keyof TSelectors>(
         key: K,
         ...args: TSelectors[K] extends SelectorFunction<TStates, any, infer P>
           ? ActionArgs<P>
@@ -323,28 +315,9 @@ export function createStore<
 
   function get(): TStates;
   function get<T>(selector: (state: TStates) => T): T;
-  function get<K extends keyof TSelectors>(
-    key: K,
-    ...args: TSelectors[K] extends SelectorFunction<TStates, any, infer P>
-      ? ActionArgs<P>
-      : never
-  ): TSelectors[K] extends SelectorFunction<TStates, infer R, any> ? R : never;
-  function get(
-    selectorOrKey?: ((state: TStates) => any) | keyof TSelectors,
-    ...args: any[]
-  ): any {
-    if (typeof selectorOrKey === 'undefined') {
-      return getState();
-    }
-    if (typeof selectorOrKey === 'function') {
-      return selectorOrKey(getState());
-    }
-    const selector = props.selectors?.[selectorOrKey];
-    if (!selector) {
-      throw new Error(`Selector "${String(selectorOrKey)}" not found`);
-    }
-    const [payload] = args;
-    return selector(getState(), payload);
+  function get<T>(selector?: (state: TStates) => T): TStates | T {
+    if (!selector) return getState();
+    return selector(getState());
   }
 
   async function dispatch<K extends keyof TActions>(
@@ -389,9 +362,9 @@ export function createStore<
     }
   }
 
-  // Update select implementation to match dispatch pattern
-  function select<K extends keyof TSelectors>(
-    key: K,
+  // Rename select to selector but keep internal names descriptive
+  function selector<K extends keyof TSelectors>(
+    selectorKey: K,
     ...args: TSelectors[K] extends SelectorFunction<TStates, any, infer P>
       ? ActionArgs<P>
       : never
@@ -400,12 +373,12 @@ export function createStore<
   ) => TSelectors[K] extends SelectorFunction<TStates, infer R, any>
     ? R
     : never {
-    const selector = props.selectors?.[key];
-    if (!selector) {
-      throw new Error(`Selector "${String(key)}" not found`);
+    const selectorFn = props.selectors?.[selectorKey];
+    if (!selectorFn) {
+      throw new Error(`Selector "${String(selectorKey)}" not found`);
     }
     const [payload] = args;
-    return (state: TStates) => selector(state, payload);
+    return (state: TStates) => selectorFn(state, payload);
   }
 
   // First create the base store without selectors
@@ -417,11 +390,9 @@ export function createStore<
   } as const;
 
   // Then return the appropriate type based on whether selectors exist
-  return (props.selectors ? { ...baseStore, select } : baseStore) as InferStore<
-    TStates,
-    TActions,
-    TSelectors
-  >;
+  return (
+    props.selectors ? { ...baseStore, selector } : baseStore
+  ) as InferStore<TStates, TActions, TSelectors>;
 }
 
 // =====================
