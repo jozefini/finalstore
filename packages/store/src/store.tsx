@@ -60,24 +60,48 @@ type PayloadByAction<TStates, TActions> = {
     : never;
 };
 
-type InferStore<TStates, TActions> = {
-  dispatch: <K extends keyof TActions>(
-    type: K,
-    ...args: ActionArgs<PayloadByAction<TStates, TActions>[K]>
-  ) => Promise<void>;
-  use: <T>(selector: (state: TStates) => T) => T;
-  get: <T>(selector?: (state: TStates) => T) => T | TStates;
-  reset: () => void;
-};
+// Update selector types to be more precise
+type SelectorFunction<TState, TResult> = (state: TState) => TResult;
 
-type CreateStoreProps<TStates, TActions> = {
+// Update CreateStoreProps to include optional selectors
+type CreateStoreProps<
+  TStates,
+  TActions extends Record<string, ActionFunction<TStates, any>>,
+  TSelectors extends Record<string, SelectorFunction<TStates, any>>
+> = {
   states: TStates;
   actions: TActions;
+  selectors?: TSelectors;
   config?: {
     name?: string;
     devtools?: boolean;
   };
 };
+
+// Improved InferStore type
+type InferStore<
+  TStates,
+  TActions extends Record<string, ActionFunction<TStates, any>>,
+  TSelectors = Record<string, SelectorFunction<TStates, any>>
+> = {
+  dispatch: <K extends keyof TActions>(
+    type: K,
+    ...args: ActionArgs<PayloadByAction<TStates, TActions>[K]>
+  ) => Promise<void>;
+  use: {
+    (): TStates;
+    <T>(selector: (state: TStates) => T): T;
+  };
+  get: {
+    (): TStates;
+    <T>(selector: (state: TStates) => T): T;
+  };
+  reset: () => void;
+} & (TSelectors extends Record<string, SelectorFunction<TStates, any>>
+  ? {
+      select: <K extends keyof TSelectors>(key: K) => TSelectors[K];
+    }
+  : Record<string, never>);
 
 // =====================
 // Utils
@@ -132,8 +156,11 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
 
 export function createStore<
   TStates,
-  TActions extends Record<string, ActionFunction<TStates, AnyType>>
->(props: CreateStoreProps<TStates, TActions>): InferStore<TStates, TActions> {
+  TActions extends Record<string, ActionFunction<TStates, any>>,
+  TSelectors extends Record<string, SelectorFunction<TStates, any>>
+>(
+  props: CreateStoreProps<TStates, TActions, TSelectors>
+): InferStore<TStates, TActions, TSelectors> {
   const initialStates = { ...props.states };
   let states = { ...initialStates };
   const actions = props.actions;
@@ -323,12 +350,24 @@ export function createStore<
     }
   }
 
-  return {
+  // Add select implementation
+  function select<K extends keyof NonNullable<TSelectors>>(key: K) {
+    const selector = props.selectors?.[key];
+    if (!selector) {
+      throw new Error(`Selector "${String(key)}" not found`);
+    }
+    return selector;
+  }
+
+  const store = {
     use,
     get,
     dispatch,
-    reset
+    reset,
+    ...(props.selectors ? { select } : {})
   };
+
+  return store as InferStore<TStates, TActions, TSelectors>;
 }
 
 // =====================
