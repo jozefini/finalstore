@@ -48,6 +48,9 @@ importers:
 
   apps/docs:
     dependencies:
+      finalstore:
+        specifier: ^1.0.6
+        version: 1.0.6
       fumadocs-core:
         specifier: 15.0.0
         version: 15.0.0(@types/react@19.0.8)(next@15.1.6(@babel/core@7.25.7)(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -2214,6 +2217,7 @@ packages:
   eslint@8.57.1:
     resolution: {integrity: sha512-ypowyDxpVSYpkXr9WPv2PAZCtNip1Mv5KTW0SCurXv/9iOpcrH9PaqUElksqEB6pChqHGDRCFTyrZlGhnLNGiA==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
 
   espree@9.6.1:
@@ -2314,6 +2318,9 @@ packages:
   fill-range@7.1.1:
     resolution: {integrity: sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==}
     engines: {node: '>=8'}
+
+  finalstore@1.0.6:
+    resolution: {integrity: sha512-AvvLmqN0yhGFhmHnaNdfh2ch9wJNp2dDjZt4/wGJDq/NXjK9pgaZQVwEvEjBscgJeUAUKHZdRGMdiSZxNa/BSg==}
 
   find-up@4.1.0:
     resolution: {integrity: sha512-PpOwAdQ/YlXQ2vj8a3h8IipDuYRi3wceVQQGYWxNINccq40Anw7BlsEXCMbt1Zt+OLA6Fq9suIpIWD0OsnISlw==}
@@ -6505,6 +6512,8 @@ snapshots:
   fill-range@7.1.1:
     dependencies:
       to-regex-range: 5.0.1
+
+  finalstore@1.0.6: {}
 
   find-up@4.1.0:
     dependencies:
