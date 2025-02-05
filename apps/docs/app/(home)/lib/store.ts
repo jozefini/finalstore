@@ -1,8 +1,8 @@
 'use client';
 
 import {
-  createStore,
-  createCollection
+  createCollection,
+  createStore
 } from '../../../../../packages/store/src/index';
 
 export const store = createStore({
