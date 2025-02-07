@@ -1,6 +1,6 @@
 {
   "name": "@finalstore/eslint-config",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "private": true,
   "devDependencies": {
     "@next/eslint-plugin-next": "^14.2.8",

@@ -1,12 +1,12 @@
 import {
   createContext,
+  createElement,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useSyncExternalStore,
-  type FC,
   type ReactNode
 } from 'react';
 
@@ -38,11 +38,11 @@ type ActionFunction<TState, TPayload = undefined> = (
   payload: TPayload
 ) => void | Promise<void>;
 
-type PayloadByAction<TStates, TActions> = {
-  [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
-    ? P
-    : never;
-};
+// type PayloadByAction<TStates, TActions> = {
+//   [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
+//     ? P
+//     : never;
+// };
 
 type CreateCollectionProps<TStates, TActions> = {
   states: TStates;
@@ -511,7 +511,7 @@ export function createScopedCollection<
   const StoreContext = createContext<InferCollection<States, Actions> | null>(
     null
   );
-  const Provider: FC<{ children: ReactNode }> = ({ children }) => {
+  const Provider = ({ children }: { children: ReactNode }) => {
     const store = useMemo(
       () => createCollection<States, Actions>(props),
       [props]
@@ -521,9 +521,7 @@ export function createScopedCollection<
         store.reset();
       };
     }, [store]);
-    return (
-      <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
-    );
+    return createElement(StoreContext.Provider, { value: store }, children);
   };
   function useStore(): InferCollection<States, Actions> {
     const context = useContext(StoreContext);

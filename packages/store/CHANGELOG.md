@@ -1,5 +1,11 @@
 # @devlab/store
 
+## 1.0.7
+
+### Patch Changes
+
+- Added docs
+
 ## 1.0.6
 
 ### Patch Changes

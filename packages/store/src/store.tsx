@@ -1,5 +1,6 @@
 import {
   createContext,
+  createElement,
   useCallback,
   useContext,
   useEffect,
@@ -422,9 +423,7 @@ export function createScopedStore<
       };
     }, [store]);
 
-    return (
-      <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
-    );
+    return createElement(StoreContext.Provider, { value: store }, children);
   };
   function useStore(): StoreType {
     const context = useContext(StoreContext);
