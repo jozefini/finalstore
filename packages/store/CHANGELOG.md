@@ -1,5 +1,11 @@
 # @devlab/store
 
+## 1.0.8
+
+### Patch Changes
+
+- 8d42a16: Add selector
+
 ## 1.0.7
 
 ### Patch Changes

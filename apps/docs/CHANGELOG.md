@@ -1,5 +1,13 @@
 # docs
 
+## 0.0.2
+
+### Patch Changes
+
+- 8d42a16: Add selector
+- Updated dependencies [8d42a16]
+  - finalstore@1.0.8
+
 ## 0.0.1
 
 ### Patch Changes
