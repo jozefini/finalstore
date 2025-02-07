@@ -38,11 +38,11 @@ type ActionFunction<TState, TPayload = undefined> = (
   payload: TPayload
 ) => void | Promise<void>;
 
-type PayloadByAction<TStates, TActions> = {
-  [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
-    ? P
-    : never;
-};
+// type PayloadByAction<TStates, TActions> = {
+//   [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
+//     ? P
+//     : never;
+// };
 
 type CreateCollectionProps<TStates, TActions> = {
   states: TStates;

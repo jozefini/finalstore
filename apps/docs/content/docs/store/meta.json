@@ -2,6 +2,7 @@
   "title": "Store",
   "defaultOpen": true,
   "pages": [
+    "selector",
     "get",
     "use",
     "reset"
