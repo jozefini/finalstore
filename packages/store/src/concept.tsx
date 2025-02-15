@@ -1,10 +1,13 @@
 'use client';
 
+import { useRef } from 'react';
+
 // Concept:
 // Instead of returning dispatch as function,
 // we return as object with methods defined as actions
 // The existing dispatch function should be removed
-import { createStore } from './store-new';
+import { createCollection } from './collection-new';
+import { createStore } from './store';
 
 export const concept = createStore({
   states: {
@@ -43,37 +46,88 @@ export const concept = createStore({
   }
 });
 
+const collection = createCollection({
+  states: {
+    text: '',
+    completed: false
+  },
+  actions: {
+    toggle: (state) => {
+      state.completed = !state.completed;
+    },
+    text: (state, text: string) => {
+      state.text = text;
+    }
+  }
+});
+
 // Instead of returning dispatch as function,
 // we return as object with methods defined as actions
 // The existing dispatch function should be removed
 // Here how it should work:
-// concept.dispatch.incrementTaskId();
-// concept.dispatch.resetTaskId();
-// concept.dispatch.toggleTheme();
-// concept.dispatch.increment();
-// concept.dispatch.decrement();
-// concept.dispatch.setText('Hello');
+collection.key('1').dispatch.toggle();
+collection.key('1').dispatch.text('New text');
 
-// // Concept for selectors, this should work for get and use methods.
-// // but instead of removing get and use, they will still exist as callable,
-// // but they would also allow selecting as object nested, e.g.
-// store.get(); // get all store
-// store.get((s) => s.theme); // get theme
-// store.get.getText(); // get text, as a new way to use selectors.
-// store.get.isTheme('light'); // get isTheme
-// // ANd also subscribed way in react components,
-// // this is similar to get but with react re-renders because is subscribing.
-// store.use(); // subscribe to the full store
-// store.use((s) => s.theme); // subscribe to the theme
-// store.use.getText(); // subscribe to the selector
-// store.use.isTheme('light'); // subscribe to the selector
-
-export function Concept() {
-  const theme = concept.use((s) => s.theme);
+const TodoItem = ({ id }: { id: string }) => {
+  const text = collection.key(id).get((s) => s.text);
+  const completed = collection.key(id).use((s) => s.completed);
 
   return (
     <div>
-      Concept theme: {theme}
+      {text} {completed ? 'completed' : 'not completed'}
+      <div>
+        <button onClick={() => collection.key(id).remove()}>( X )</button>
+        <button onClick={() => collection.key(id).dispatch.toggle()}>
+          Toggle
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const TodoList = () => {
+  const currentId = useRef(0);
+  const todos = collection.useKeys();
+  const total = collection.useSize();
+
+  return (
+    <div>
+      <h3>Todos ({total})</h3>
+      <div>
+        <button
+          onClick={() => {
+            const key = currentId.current.toString();
+            collection.key(key).set({
+              text: `Todo ${key}`,
+              completed: false
+            });
+            currentId.current++;
+          }}
+        >
+          Add todo
+        </button>
+      </div>
+      {todos.map((id) => (
+        <div key={id}>
+          <TodoItem id={id} />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export function Concept() {
+  const isDarkTheme = concept.useSelector.isTheme('light');
+  const theme = concept.use((s) => s.theme);
+  console.log('isDarkTheme', isDarkTheme);
+
+  return (
+    <div>
+      <TodoList />
+      <br />
+      Theme: {theme}
+      <br />
+      Is dark theme: {isDarkTheme ? 'yes' : 'no'}
       <div>
         <button onClick={() => concept.dispatch.toggleTheme()}>
           Toggle theme

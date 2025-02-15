@@ -70,8 +70,8 @@ type SelectorFunction<TState, TResult, TPayload = undefined> = (
 // Update CreateStoreProps to include optional selectors
 type CreateStoreProps<
   TStates,
-  TActions extends Record<string, ActionFunction<TStates, any>>,
-  TSelectors extends Record<string, SelectorFunction<TStates, any, any>>
+  TActions extends Record<string, ActionFunction<TStates, AnyType>>,
+  TSelectors extends Record<string, SelectorFunction<TStates, AnyType, AnyType>>
 > = {
   states: TStates;
   actions: TActions;
@@ -82,16 +82,19 @@ type CreateStoreProps<
   };
 };
 
-// Update InferStore type to use TStates consistently
+// Update InferStore type to include getSelector and useSelector
 type InferStore<
   TStates,
-  TActions extends Record<string, ActionFunction<TStates, any>>,
-  TSelectors extends Record<string, SelectorFunction<TStates, any, any>>
+  TActions extends Record<string, ActionFunction<TStates, AnyType>>,
+  TSelectors extends Record<string, SelectorFunction<TStates, AnyType, AnyType>>
 > = {
-  dispatch: <K extends keyof TActions>(
-    type: K,
-    ...args: ActionArgs<PayloadByAction<TStates, TActions>[K]>
-  ) => Promise<void>;
+  dispatch: {
+    [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
+      ? undefined extends P
+        ? () => void
+        : (payload: P) => void
+      : never;
+  };
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
@@ -100,21 +103,30 @@ type InferStore<
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
   };
+  getSelector: {
+    [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
+      TStates,
+      infer R,
+      infer P
+    >
+      ? undefined extends P
+        ? () => R
+        : (payload: P) => R
+      : never;
+  };
+  useSelector: {
+    [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
+      TStates,
+      infer R,
+      infer P
+    >
+      ? undefined extends P
+        ? () => R
+        : (payload: P) => R
+      : never;
+  };
   reset: () => void;
-} & (TSelectors extends Record<string, SelectorFunction<TStates, any, any>>
-  ? {
-      selector: <K extends keyof TSelectors>(
-        key: K,
-        ...args: TSelectors[K] extends SelectorFunction<TStates, any, infer P>
-          ? ActionArgs<P>
-          : never
-      ) => (
-        state: TStates
-      ) => TSelectors[K] extends SelectorFunction<TStates, infer R, any>
-        ? R
-        : never;
-    }
-  : Record<string, never>);
+};
 
 // =====================
 // Utils
@@ -169,8 +181,8 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
 
 export function createStore<
   TStates,
-  TActions extends Record<string, ActionFunction<TStates, any>>,
-  TSelectors extends Record<string, SelectorFunction<TStates, any, any>>
+  TActions extends Record<string, ActionFunction<TStates, AnyType>>,
+  TSelectors extends Record<string, SelectorFunction<TStates, AnyType, AnyType>>
 >(
   props: CreateStoreProps<TStates, TActions, TSelectors>
 ): InferStore<TStates, TActions, TSelectors> {
@@ -321,6 +333,14 @@ export function createStore<
     return selector(getState());
   }
 
+  // Update the dispatch object creation to handle the promise internally
+  const dispatchObject = Object.keys(actions).reduce((acc, actionKey) => {
+    acc[actionKey] = (payload?: AnyType) => {
+      void dispatch(actionKey, payload);
+    };
+    return acc;
+  }, {} as AnyType);
+
   async function dispatch<K extends keyof TActions>(
     type: K,
     ...args: ActionArgs<PayloadByAction<TStates, TActions>[K]>
@@ -363,37 +383,42 @@ export function createStore<
     }
   }
 
-  // Rename select to selector but keep internal names descriptive
-  function selector<K extends keyof TSelectors>(
-    selectorKey: K,
-    ...args: TSelectors[K] extends SelectorFunction<TStates, any, infer P>
-      ? ActionArgs<P>
-      : never
-  ): (
-    state: TStates
-  ) => TSelectors[K] extends SelectorFunction<TStates, infer R, any>
-    ? R
-    : never {
-    const selectorFn = props.selectors?.[selectorKey];
-    if (!selectorFn) {
-      throw new Error(`Selector "${String(selectorKey)}" not found`);
-    }
-    const [payload] = args;
-    return (state: TStates) => selectorFn(state, payload);
+  // Create selector methods
+  function createSelectorMethods(
+    selectors: TSelectors,
+    getState: () => TStates,
+    useHook?: typeof use
+  ) {
+    return Object.keys(selectors).reduce((acc, key) => {
+      acc[key] = (payload?: AnyType) => {
+        if (useHook) {
+          return useHook((state: TStates) => selectors[key](state, payload));
+        }
+        return selectors[key](getState(), payload);
+      };
+      return acc;
+    }, {} as AnyType);
   }
 
-  // First create the base store without selectors
+  // In createStore, before returning:
+  const getterMethods = props.selectors
+    ? createSelectorMethods(props.selectors, getState)
+    : {};
+
+  const useMethods = props.selectors
+    ? createSelectorMethods(props.selectors, getState, use)
+    : {};
+
   const baseStore = {
+    dispatch: dispatchObject,
     use,
     get,
-    dispatch,
+    getSelector: getterMethods,
+    useSelector: useMethods,
     reset
   } as const;
 
-  // Then return the appropriate type based on whether selectors exist
-  return (
-    props.selectors ? { ...baseStore, selector } : baseStore
-  ) as InferStore<TStates, TActions, TSelectors>;
+  return baseStore as InferStore<TStates, TActions, TSelectors>;
 }
 
 // =====================
@@ -405,7 +430,7 @@ export function createScopedStore<
   TActions extends Record<string, ActionFunction<TStates, unknown>>,
   TSelectors extends Record<
     string,
-    SelectorFunction<TStates, any, any>
+    SelectorFunction<TStates, AnyType, AnyType>
   > = Record<string, never>
 >(props: CreateStoreProps<TStates, TActions, TSelectors>) {
   type StoreType = InferStore<TStates, TActions, TSelectors>;
