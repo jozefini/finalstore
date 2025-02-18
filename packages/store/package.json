@@ -1,7 +1,7 @@
 {
   "name": "finalstore",
   "license": "MIT",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "exports": {
     "./package.json": "./package.json",
     ".": {
@@ -34,10 +34,10 @@
   "publishConfig": {
     "access": "public"
   },
-  "homepage": "https://github.com/jozefini/react-store",
+  "homepage": "https://store.jozefini.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jozefini/react-store.git"
+    "url": "git+https://github.com/jozefini/finalstore.git"
   },
   "keywords": [
     "react",
