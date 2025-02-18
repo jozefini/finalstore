@@ -44,11 +44,22 @@ type ActionFunction<TState, TPayload = undefined> = (
 //     : never;
 // };
 
-type CreateCollectionProps<TStates, TActions> = {
+type SelectorFunction<TState, TResult, TPayload = undefined> = (
+  state: TState,
+  payload: TPayload
+) => TResult;
+
+type CreateCollectionProps<
+  TStates,
+  TActions extends Record<string, ActionFunction<TStates, any>>,
+  TSelectors extends Record<
+    string,
+    SelectorFunction<TStates, any, any>
+  > = Record<string, never>
+> = {
   states: TStates;
-  actions: {
-    [K in keyof TActions]: ActionFunction<TStates, TActions[K]>;
-  };
+  actions: TActions;
+  selectors?: TSelectors;
   initialMap?: Map<string, TStates>;
   config?: {
     devtools?: boolean;
@@ -68,7 +79,14 @@ type CollectionSubscribers<States> = {
   keys: Map<number, Subscriber<string[]>>;
 };
 
-type InferCollection<TStates, TActions> = {
+type InferCollection<
+  TStates,
+  TActions,
+  TSelectors extends Record<
+    string,
+    SelectorFunction<TStates, any, any>
+  > = Record<string, never>
+> = {
   clear: () => void;
   reset: () => void;
   useSize: () => number;
@@ -96,6 +114,28 @@ type InferCollection<TStates, TActions> = {
       (): TStates | undefined;
       <T>(selector: (state: TStates) => T): T;
     };
+    getSelector: {
+      [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
+        TStates,
+        infer R,
+        infer P
+      >
+        ? undefined extends P
+          ? () => R
+          : (payload: P) => R
+        : never;
+    };
+    useSelector: {
+      [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
+        TStates,
+        infer R,
+        infer P
+      >
+        ? undefined extends P
+          ? () => R
+          : (payload: P) => R
+        : never;
+    };
   };
 };
 
@@ -105,8 +145,14 @@ type InferCollection<TStates, TActions> = {
 
 export function createCollection<
   States,
-  Actions extends Record<string, unknown>
->(props: CreateCollectionProps<States, Actions>) {
+  Actions extends Record<string, ActionFunction<States, any>>,
+  Selectors extends Record<string, SelectorFunction<States, any, any>> = Record<
+    string,
+    never
+  >
+>(
+  props: CreateCollectionProps<States, Actions, Selectors>
+): InferCollection<States, Actions, Selectors> {
   const initialMap = props.initialMap
     ? props.initialMap
     : new Map<string, States>();
@@ -574,12 +620,33 @@ export function createCollection<
 
   // Update key method to include get and use
   function key(id: string) {
+    // Create selector methods for both get and use
+    const createSelectorMethods = (useHook?: boolean) => {
+      if (!props.selectors) return {};
+
+      return Object.keys(props.selectors).reduce((acc, key) => {
+        acc[key] = (payload?: any) => {
+          const selector = props.selectors![key];
+          const state = states.get(id);
+          if (!state) return undefined;
+
+          if (useHook) {
+            return useKey(id, (s) => selector(s, payload));
+          }
+          return selector(state, payload);
+        };
+        return acc;
+      }, {} as any);
+    };
+
     return {
       dispatch: createKeyDispatch(id),
       remove: () => remove(id),
       set: (state: States) => set(id, state),
       get: createKeyGet(id),
-      use: createKeyUse(id)
+      use: createKeyUse(id),
+      getSelector: createSelectorMethods(false),
+      useSelector: createSelectorMethods(true)
     };
   }
 
