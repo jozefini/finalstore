@@ -3,21 +3,21 @@
 import { collection } from '../../lib/store';
 
 const TodoChecked = ({ id }: { id: string }) => {
-  const completed = collection.use(id, (s) => s.completed);
+  const completed = collection.key(id).use((s) => s.completed);
 
   return (
     <input
       type="checkbox"
       checked={completed}
-      onChange={() => collection.dispatch(id, 'toggle', undefined)}
+      onChange={() => collection.key(id).dispatch.toggle()}
       className="h-4 w-4 cursor-pointer"
     />
   );
 };
 
 const TodoText = ({ id }: { id: string }) => {
-  const text = collection.use(id, (s) => s.text);
-  const completed = collection.use(id, (s) => s.completed);
+  const text = collection.key(id).use((s) => s.text);
+  const completed = collection.key(id).use((s) => s.completed);
 
   return (
     <span className={completed ? 'text-fd-muted-foreground line-through' : ''}>
@@ -29,7 +29,7 @@ const TodoText = ({ id }: { id: string }) => {
 const TodoRemove = ({ id }: { id: string }) => {
   return (
     <button
-      onClick={() => collection.remove(id)}
+      onClick={() => collection.key(id).remove()}
       className="text-fd-muted-foreground hover:text-fd-foreground ml-auto cursor-pointer p-2"
     >
       ×

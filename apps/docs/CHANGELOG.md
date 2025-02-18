@@ -1,5 +1,16 @@
 # docs
 
+## 0.1.0
+
+### Minor Changes
+
+- New API design
+
+### Patch Changes
+
+- Updated dependencies
+  - finalstore@1.1.0
+
 ## 0.0.2
 
 ### Patch Changes

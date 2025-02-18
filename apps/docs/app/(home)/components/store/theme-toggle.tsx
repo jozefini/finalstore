@@ -5,7 +5,7 @@ import { store } from '../../lib/store';
 const ThemeToggleButton = () => {
   return (
     <button
-      onClick={() => store.dispatch('toggleTheme')}
+      onClick={() => store.dispatch.toggleTheme()}
       className="bg-fd-primary text-fd-primary-foreground cursor-pointer rounded-md px-4 py-2 hover:opacity-90"
     >
       Toggle Theme

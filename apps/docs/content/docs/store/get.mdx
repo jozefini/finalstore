@@ -13,10 +13,12 @@ const store = createStore({
     count: 0,
     user: null as { name: string } | null
   },
-  actions: {
-    increment: (state) => {
-      state.count++;
-    }
+  actions: {}, // Required, even if empty
+  selectors: {
+    userInfo: (state) => ({
+      name: state.user?.name,
+      count: state.count
+    })
   }
 });
 ```
@@ -29,13 +31,13 @@ function handleClick() {
   const state = store.get();
   console.log('Current state:', state);
 
-  // Get specific value
+  // Get specific value using custom selector
   const count = store.get((state) => state.count);
   console.log('Current count:', count);
 }
 ```
 
-## With Selectors
+## With Custom Selectors
 
 ```tsx
 function logUserData() {
@@ -45,5 +47,15 @@ function logUserData() {
   }));
 
   console.log('User data:', userData);
+}
+```
+
+## With Predefined Selectors
+
+```tsx
+function getUserInfo() {
+  // Using predefined selector
+  const userInfo = store.getSelector.userInfo();
+  console.log('User info:', userInfo);
 }
 ```
