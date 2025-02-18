@@ -3,7 +3,7 @@ title: get()
 icon: Parentheses
 ---
 
-The `get()` method retrieves a specific item from your collection by its key. You can either get the entire item state or use a selector to extract specific values. This method is synchronous and ideal for accessing collection data outside of React components.
+The `get()` method retrieves a specific item from your collection by its key. You can access the entire item state, use a custom selector, or use predefined selectors.
 
 ```tsx
 import { createCollection } from 'finalstore';
@@ -14,19 +14,46 @@ const users = createCollection({
     age: 0,
     active: true
   },
-  actions: {
-    updateName: (state, name: string) => {
-      state.name = name;
-    }
+  actions: {}, // Required, even if empty
+  selectors: {
+    userDetails: (state) => ({
+      displayName: state.name,
+      isActive: state.active
+    })
   }
 });
+```
 
-// Add some user
-users.insert('user-1', { name: 'John', age: 25, active: true });
+## Basic Usage
 
-// Get specific item
-const user = users.get('user-1');
+```tsx
+// Get entire item state
+const user = users.key('user-1').get();
+console.log('User:', user);
 
-// Get with selector
-const name = users.get('user-1', (state) => state.name);
+// Get with custom selector
+const name = users.key('user-1').get((state) => state.name);
+console.log('Name:', name);
+```
+
+## With Custom Selectors
+
+```tsx
+function getUserStatus(userId: string) {
+  const status = users.key(userId).get((state) => ({
+    name: state.name,
+    active: state.active
+  }));
+
+  console.log('User status:', status);
+}
+```
+
+## With Predefined Selectors
+
+```tsx
+function logUserDetails(userId: string) {
+  const details = users.key(userId).getSelector.userDetails();
+  console.log('User details:', details);
+}
 ```

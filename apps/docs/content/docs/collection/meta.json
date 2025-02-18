@@ -2,14 +2,15 @@
   "title": "Collection",
   "defaultOpen": true,
   "pages": [
-    "insert",
+    "selector",
+    "set",
     "get",
+    "use",
+    "remove",
     "getSize",
     "getKeys",
-    "use",
     "useSize",
     "useKeys",
-    "remove",
     "reset",
     "clear"
   ]

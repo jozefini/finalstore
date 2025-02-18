@@ -20,10 +20,11 @@ const store = createStore({
     setUser: (state, payload: { name: string }) => {
       state.user = payload;
     },
-    fetchUser: (state, id: string) => {
+    fetchUser: async (state, id: string) => {
       state.user = await api.getUser(id);
     }
-  }
+  },
+  selectors: {} // Required, even if empty
 });
 ```
 
@@ -31,10 +32,10 @@ const store = createStore({
 
 ```tsx
 // Without payload
-store.dispatch('increment');
+store.dispatch.increment();
 
 // With payload
-store.dispatch('setUser', { name: 'John' });
+store.dispatch.setUser({ name: 'John' });
 ```
 
 ## Async Actions
@@ -42,7 +43,7 @@ store.dispatch('setUser', { name: 'John' });
 ```tsx
 async function loadUser(id: string) {
   // Handles async actions automatically
-  await store.dispatch('fetchUser', id);
+  await store.dispatch.fetchUser(id);
   console.log(
     'User loaded:',
     store.get((s) => s.user)

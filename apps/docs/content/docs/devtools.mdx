@@ -23,6 +23,12 @@ const store = createStore({
       state.user = user;
     }
   },
+  selectors: {
+    userInfo: (state) => ({
+      name: state.user?.name,
+      count: state.count
+    })
+  },
   config: {
     name: 'AppStore', // Name in DevTools
     devtools: true // Enable DevTools
@@ -49,6 +55,12 @@ const users = createCollection({
       state.active = !state.active;
     }
   },
+  selectors: {
+    userInfo: (state) => ({
+      name: state.name,
+      status: state.active ? 'Active' : 'Inactive'
+    })
+  },
   config: {
     name: 'Users', // Name in DevTools
     devtools: true // Enable DevTools
@@ -56,10 +68,10 @@ const users = createCollection({
 });
 
 // Actions will be tracked in Redux DevTools
-users.insert('user-1', { name: 'John', age: 25, active: true });
-users.dispatch('user-1', 'updateName', 'John Doe');
-users.dispatch('user-1', 'toggleActive');
-users.remove('user-1');
+users.key('user-1').set({ name: 'John', age: 25, active: true });
+users.key('user-1').dispatch.updateName('John Doe');
+users.key('user-1').dispatch.toggleActive();
+users.key('user-1').remove();
 ```
 
 Features available in DevTools:

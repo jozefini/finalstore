@@ -30,6 +30,10 @@ const users = createCollection({
       state.active = !state.active;
     }
   },
+  selectors: {
+    displayName: (state) => `${state.name} (${state.age})`,
+    isAdult: (state) => state.age >= 18
+  },
   config: {
     name: 'Users',
     devtools: true
@@ -46,7 +50,7 @@ function UserList() {
       <h2>Users ({totalUsers})</h2>
       <button
         onClick={() => {
-          users.insert(`user-${totalUsers + 1}`, {
+          users.key(`user-${totalUsers + 1}`).set({
             name: 'New User',
             age: 0,
             active: true
@@ -65,19 +69,18 @@ function UserList() {
 }
 
 function UserItem({ id }: { id: string }) {
-  const user = users.use(id); // Subscribe to specific user
-
-  if (!user) return null;
+  const name = users.key(id).useSelector.displayName(); // Predefined selector
+  const isActive = users.key(id).use((s) => s.active); // Custom selector
 
   return (
     <li>
       <input
         type="checkbox"
-        checked={user.active}
-        onChange={() => users.dispatch(id, 'toggleActive')}
+        checked={isActive}
+        onChange={() => users.key(id).dispatch.toggleActive()}
       />
-      <span>{user.name}</span>
-      <button onClick={() => users.remove(id)}>Delete</button>
+      <span>{name}</span>
+      <button onClick={() => users.key(id).remove()}>Delete</button>
     </li>
   );
 }
@@ -88,6 +91,8 @@ function UserItem({ id }: { id: string }) {
 - Map-based collection management
 - Individual item subscriptions
 - Collection size and keys tracking
+- Predefined selectors
+- Custom selectors
 - TypeScript-first
 - Redux DevTools support
 - Deep equality checks for performance

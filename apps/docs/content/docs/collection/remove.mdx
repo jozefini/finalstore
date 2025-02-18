@@ -14,26 +14,32 @@ const users = createCollection({
     age: 0,
     active: true
   },
-  actions: {
-    updateName: (state, name: string) => {
-      state.name = name;
-    }
-  }
+  actions: {}, // Required, even if empty
+  selectors: {} // Required, even if empty
 });
+```
 
+## Basic Usage
+
+```tsx
+// Remove a specific user
+users.key('user-1').remove();
+```
+
+## Inside Components
+
+```tsx
 function UserList() {
   const userIds = users.useKeys();
 
   return (
     <div>
+      <h2>Users ({users.useSize()})</h2>
       <ul>
         {userIds.map((userId) => (
           <li key={userId}>
-            <button
-              onClick={() => {
-                users.remove(userId);
-              }}
-            >
+            <UserInfo userId={userId} />
+            <button onClick={() => users.key(userId).remove()}>
               Delete User
             </button>
           </li>
@@ -41,5 +47,21 @@ function UserList() {
       </ul>
     </div>
   );
+}
+```
+
+## With Confirmation
+
+```tsx
+function DeleteUserButton({ userId }: { userId: string }) {
+  const name = users.key(userId).use((s) => s.name);
+
+  const handleDelete = () => {
+    if (confirm(`Are you sure you want to delete ${name}?`)) {
+      users.key(userId).remove();
+    }
+  };
+
+  return <button onClick={handleDelete}>Delete User</button>;
 }
 ```

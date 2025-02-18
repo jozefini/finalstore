@@ -3,7 +3,7 @@ title: selector()
 icon: Parentheses
 ---
 
-The `selector` method allows you to create reusable selectors that can compute derived state with optional parameters. This is particularly useful when you need to share complex state selections or computations across components.
+The `selector` methods allow you to create reusable selectors that can compute derived state with optional parameters. Selectors are required when creating a store, even if empty.
 
 ```tsx
 import { createStore } from 'finalstore';
@@ -12,15 +12,7 @@ const store = createStore({
   states: {
     todos: [] as { id: number; text: string; completed: boolean }[]
   },
-  actions: {
-    addTodo: (state, payload: { text: string }) => {
-      state.todos.push({
-        id: Date.now(),
-        text: payload.text,
-        completed: false
-      });
-    }
-  },
+  actions: {}, // Required, even if empty
   selectors: {
     // Selector with parameter
     filteredTodos: (state, completed?: boolean) => {
@@ -33,14 +25,14 @@ const store = createStore({
 });
 ```
 
-## Inside Components (use)
+## Inside Components (useSelector)
 
-Use the `use` hook with selectors for reactive state in components:
+Use the `useSelector` for reactive state in components:
 
 ```tsx
 function TodoList({ showCompleted }: { showCompleted: boolean }) {
-  // Use it with the use hook for reactive updates
-  const todos = store.use(store.selector('filteredTodos', showCompleted));
+  // Use useSelector for reactive updates
+  const todos = store.useSelector.filteredTodos(showCompleted);
 
   return (
     <ul>
@@ -53,8 +45,8 @@ function TodoList({ showCompleted }: { showCompleted: boolean }) {
 
 function TodoStats() {
   // Both will trigger re-renders when their values change
-  const completedTodos = store.use(store.selector('filteredTodos', true));
-  const total = store.use(store.selector('totalTodos'));
+  const completedTodos = store.useSelector.filteredTodos(true);
+  const total = store.useSelector.totalTodos();
 
   return (
     <div>
@@ -65,37 +57,36 @@ function TodoStats() {
 }
 ```
 
-## Outside Components (get)
+## Outside Components (getSelector)
 
-Use the `get` method with selectors for non-reactive state access:
+Use the `getSelector` for non-reactive state access:
 
 ```tsx
 function handleTodoAction() {
   // Get current values synchronously
-  const completedTodos = store.get(store.selector('filteredTodos', true));
-  const total = store.get(store.selector('totalTodos'));
+  const completedTodos = store.getSelector.filteredTodos(true);
+  const total = store.getSelector.totalTodos();
 
   console.log(`${completedTodos.length} of ${total} todos completed`);
 }
 
 // Can be used in async functions
 async function processTodos() {
-  const todos = store.get(store.selector('filteredTodos', true));
-
+  const todos = store.getSelector.filteredTodos(true);
   await saveTodos(todos);
 }
 ```
 
 ## Type Safety
 
-The `selector` method is fully type-safe. TypeScript will ensure that:
+Selectors are fully type-safe. TypeScript will ensure that:
 
-- The selector key exists in your store's selectors
+- The selector exists in your store's selectors
 - The parameter type matches the selector's expected parameter type
 - The return type matches the selector's defined return type
 
 ```tsx
 // TypeScript will catch these errors:
-store.selector('nonexistentSelector'); // Error: Selector doesn't exist
-store.selector('filteredTodos', 123); // Error: Expected boolean | undefined
+store.useSelector.nonexistentSelector(); // Error: Property doesn't exist
+store.getSelector.filteredTodos(123); // Error: Expected boolean | undefined
 ```

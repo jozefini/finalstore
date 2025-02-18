@@ -22,7 +22,8 @@ const modal = createScopedStore({
     setTitle: (state, title: string) => {
       state.title = title;
     }
-  }
+  },
+  selectors: {}
 });
 
 function Modal() {
@@ -69,7 +70,8 @@ const todoList = createScopedCollection({
     setText: (state, text: string) => {
       state.text = text;
     }
-  }
+  },
+  selectors: {}
 });
 
 function TodoList() {
@@ -88,7 +90,7 @@ function AddTodo() {
   return (
     <button
       onClick={() => {
-        collection.insert(`todo-${size + 1}`, {
+        collection.key(`todo-${size + 1}`).set({
           text: 'New Todo',
           completed: false
         });
@@ -123,7 +125,7 @@ function TodoItem({ id }: { id: string }) {
       <input
         type="checkbox"
         checked={todo.completed}
-        onChange={() => collection.dispatch(id, 'toggle')}
+        onChange={() => collection.key(id).dispatch.toggle()}
       />
       <span>{todo.text}</span>
     </li>

@@ -3,7 +3,7 @@ title: use()
 icon: Parentheses
 ---
 
-The `use()` hook subscribes to changes of a specific item in your collection. When the item's state changes, your component will automatically re-render. You can subscribe to the entire item state or use a selector for specific values.
+The `use()` hook subscribes to changes of a specific item in your collection. When the item's state changes, your component will automatically re-render.
 
 ```tsx
 import { createCollection } from 'finalstore';
@@ -14,24 +14,64 @@ const users = createCollection({
     age: 0,
     active: true
   },
-  actions: {
-    updateName: (state, name: string) => {
-      state.name = name;
-    }
+  actions: {}, // Required, even if empty
+  selectors: {
+    userDetails: (state) => ({
+      displayName: state.name,
+      isActive: state.active
+    })
   }
 });
+```
 
+## Basic Usage
+
+```tsx
 function UserProfile({ userId }: { userId: string }) {
-  // Get specific item
-  const user = users.use(userId);
+  // Get entire item state
+  const user = users.key(userId).use();
 
-  // Get with selector (recommended)
-  const name = users.use(userId, (state) => state.name);
+  // Get with custom selector (recommended)
+  const name = users.key(userId).use((state) => state.name);
 
   return (
     <div>
       <p>Name: {name}</p>
       {user && <p>Age: {user.age}</p>}
+    </div>
+  );
+}
+```
+
+## With Custom Selectors
+
+```tsx
+function UserStatus({ userId }: { userId: string }) {
+  const { name, active } = users.key(userId).use((state) => ({
+    name: state.name,
+    active: state.active
+  }));
+
+  return (
+    <div>
+      <p>
+        {name} is {active ? 'active' : 'inactive'}
+      </p>
+    </div>
+  );
+}
+```
+
+## With Predefined Selectors
+
+```tsx
+function UserDetails({ userId }: { userId: string }) {
+  const details = users.key(userId).useSelector.userDetails();
+
+  return (
+    <div>
+      <p>{details.displayName}</p>
+      <p>Status: {details.isActive ? 'Active' : 'Inactive'}</p>
     </div>
   );
 }

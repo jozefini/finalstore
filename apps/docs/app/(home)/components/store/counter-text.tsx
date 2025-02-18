@@ -16,14 +16,14 @@ export function Counter() {
       </p>
       <div className="flex items-center gap-4">
         <button
-          onClick={() => store.dispatch('decrement')}
+          onClick={() => store.dispatch.decrement()}
           className="border-fd-border hover:bg-fd-accent cursor-pointer rounded-md border px-4 py-2"
         >
           -
         </button>
         <CounterText />
         <button
-          onClick={() => store.dispatch('increment')}
+          onClick={() => store.dispatch.increment()}
           className="border-fd-border hover:bg-fd-accent cursor-pointer rounded-md border px-4 py-2"
         >
           +

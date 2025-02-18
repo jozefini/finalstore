@@ -1,0 +1,108 @@
+---
+title: selector()
+icon: Parentheses
+---
+
+The `selector` methods allow you to create reusable selectors that can compute derived state with optional parameters. Selectors are required when creating a collection, even if empty.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const todos = createCollection({
+  states: {
+    text: '',
+    completed: false,
+    priority: 'low' as 'low' | 'medium' | 'high',
+    createdAt: new Date()
+  },
+  actions: {}, // Required, even if empty
+  selectors: {
+    // Selector with parameter
+    isPriority: (state, level: 'low' | 'medium' | 'high') => {
+      return state.priority === level;
+    },
+    // Selector without parameter
+    displayInfo: (state) => ({
+      text: state.text,
+      status: state.completed ? 'Done' : 'Pending',
+      age: Date.now() - state.createdAt.getTime()
+    })
+  }
+});
+```
+
+## Inside Components (useSelector)
+
+Use the `useSelector` for reactive state in components:
+
+```tsx
+function TodoItem({ id }: { id: string }) {
+  // Use useSelector for reactive updates
+  const isHighPriority = todos.key(id).useSelector.isPriority('high');
+  const info = todos.key(id).useSelector.displayInfo();
+
+  return (
+    <div>
+      <p>{info.text}</p>
+      <p>Status: {info.status}</p>
+      {isHighPriority && <span>⚡ High Priority</span>}
+    </div>
+  );
+}
+
+function TodoPriorityList({ level }: { level: 'low' | 'medium' | 'high' }) {
+  const todoIds = todos.useKeys();
+
+  return (
+    <div>
+      <h3>{level} Priority Tasks</h3>
+      {todoIds.map((id) => (
+        <div key={id}>
+          {todos.key(id).useSelector.isPriority(level) && <TodoItem id={id} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+## Outside Components (getSelector)
+
+Use the `getSelector` for non-reactive state access:
+
+```tsx
+function logTodoInfo(todoId: string) {
+  // Get current values synchronously
+  const info = todos.key(todoId).getSelector.displayInfo();
+  const isUrgent = todos.key(todoId).getSelector.isPriority('high');
+
+  console.log(`Todo: ${info.text}`);
+  console.log(`Status: ${info.status}`);
+  console.log(`Age: ${info.age}ms`);
+  console.log(`Urgent: ${isUrgent ? 'Yes' : 'No'}`);
+}
+
+// Can be used in async functions
+async function processTodos() {
+  const todoIds = todos.getKeys();
+  const highPriorityTodos = todoIds.filter((id) =>
+    todos.key(id).getSelector.isPriority('high')
+  );
+
+  await saveTodos(highPriorityTodos);
+}
+```
+
+## Type Safety
+
+Selectors are fully type-safe. TypeScript will ensure that:
+
+- The selector exists in your collection's selectors
+- The parameter type matches the selector's expected parameter type
+- The return type matches the selector's defined return type
+
+```tsx
+// TypeScript will catch these errors:
+todos.key('123').useSelector.nonexistentSelector(); // Error: Property doesn't exist
+todos.key('123').getSelector.isPriority('invalid'); // Error: Expected 'low' | 'medium' | 'high'
+```
