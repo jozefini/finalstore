@@ -11,122 +11,15 @@ import {
 } from 'react';
 
 import { isDeepEqual } from './store';
-
-// =====================
-// Type Helpers
-// =====================
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-type AnyType = any;
-type IsOptionalPayload<T> = unknown extends T
-  ? true
-  : undefined extends T
-    ? true
-    : false;
-
-type ActionArgs<T> =
-  IsOptionalPayload<T> extends true
-    ? [payload?: T, shouldNotify?: boolean]
-    : [payload: T, shouldNotify?: boolean];
-
-// =====================
-// Collection Types
-// =====================
-type ActionFunction<TState, TPayload = undefined> = (
-  state: TState,
-  payload: TPayload
-) => void | Promise<void>;
-
-type SelectorFunction<TState, TPayload = undefined> = (
-  state: TState,
-  payload: TPayload
-) => any;
-
-type CreateCollectionProps<
-  TStates,
-  TActions extends Record<string, ActionFunction<TStates, any>>,
-  TSelectors extends Record<string, SelectorFunction<TStates, any>>
-> = {
-  states: TStates;
-  actions: TActions;
-  selectors: TSelectors;
-  initialMap?: Map<string, TStates>;
-  config?: {
-    devtools?: boolean;
-    name?: string;
-  };
-};
-
-type Subscriber<T> = {
-  selector: (state: T) => unknown;
-  callback: () => void;
-  lastValue: unknown;
-};
-
-type CollectionSubscribers<States> = {
-  byKey: Map<string, Map<number, Subscriber<States>>>;
-  size: Map<number, Subscriber<number>>;
-  keys: Map<number, Subscriber<string[]>>;
-};
-
-type InferCollection<
-  TStates,
-  TActions,
-  TSelectors extends Record<string, SelectorFunction<TStates, any>> = Record<
-    string,
-    never
-  >
-> = {
-  clear: () => void;
-  reset: () => void;
-  useSize: () => number;
-  useKeys: () => string[];
-  getSize: () => number;
-  getKeys: () => string[];
-  key: (key: string) => {
-    dispatch: {
-      [K in keyof TActions]: TActions[K] extends ActionFunction<
-        TStates,
-        infer P
-      >
-        ? undefined extends P
-          ? () => void
-          : (payload: P) => void
-        : never;
-    };
-    remove: () => void;
-    set: (state: TStates) => void;
-    get: {
-      (): TStates | undefined;
-      <T>(selector: (state: TStates) => T): T;
-    };
-    use: {
-      (): TStates | undefined;
-      <T>(selector: (state: TStates) => T): T;
-    };
-    getSelector: {
-      [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
-        TStates,
-        infer P
-      >
-        ? undefined extends P
-          ? () => ReturnType<TSelectors[K]>
-          : (payload: P) => ReturnType<TSelectors[K]>
-        : never;
-    };
-    useSelector: {
-      [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
-        TStates,
-        infer P
-      >
-        ? undefined extends P
-          ? () => ReturnType<TSelectors[K]>
-          : (payload: P) => ReturnType<TSelectors[K]>
-        : never;
-    };
-  };
-};
+import type {
+  ActionArgs,
+  AnyType,
+  CollectionActionFunction,
+  CollectionSelectorFunction,
+  CollectionSubscribers,
+  CreateCollectionProps,
+  InferCollection
+} from './types';
 
 // =====================
 // Collection
@@ -134,8 +27,8 @@ type InferCollection<
 
 export function createCollection<
   States,
-  Actions extends Record<string, ActionFunction<States, any>>,
-  Selectors extends Record<string, SelectorFunction<States, any>>
+  Actions extends Record<string, CollectionActionFunction<States, AnyType>>,
+  Selectors extends Record<string, CollectionSelectorFunction<States, AnyType>>
 >(
   props: CreateCollectionProps<States, Actions, Selectors>
 ): InferCollection<States, Actions, Selectors> {
@@ -530,11 +423,11 @@ export function createCollection<
   // Create dispatch object for a specific key
   function createKeyDispatch(key: string) {
     return Object.keys(actions).reduce((acc, actionKey) => {
-      acc[actionKey] = (payload?: any) => {
+      acc[actionKey] = (payload?: AnyType) => {
         void dispatch(key, actionKey, payload);
       };
       return acc;
-    }, {} as any);
+    }, {} as AnyType);
   }
 
   // Create key-specific get method
@@ -614,7 +507,7 @@ export function createCollection<
       if (!props.selectors) return {};
 
       return Object.keys(props.selectors).reduce((acc, key) => {
-        acc[key] = (payload?: any) => {
+        acc[key] = (payload?: AnyType) => {
           const selector = props.selectors[key];
           const state = states.get(id);
           if (!state) return undefined;
@@ -625,7 +518,7 @@ export function createCollection<
           return selector(state, payload);
         };
         return acc;
-      }, {} as any);
+      }, {} as AnyType);
     };
 
     return {
@@ -656,8 +549,8 @@ export function createCollection<
 
 export function createScopedCollection<
   States,
-  Actions extends Record<string, ActionFunction<States, any>>,
-  Selectors extends Record<string, SelectorFunction<States, any>>
+  Actions extends Record<string, CollectionActionFunction<States, AnyType>>,
+  Selectors extends Record<string, CollectionSelectorFunction<States, AnyType>>
 >(props: CreateCollectionProps<States, Actions, Selectors>) {
   const StoreContext = createContext<InferCollection<
     States,

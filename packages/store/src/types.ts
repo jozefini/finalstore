@@ -155,7 +155,7 @@ export type CreateCollectionProps<
 > = {
   states: TStates;
   actions: TActions;
-  selectors: TSelectors;
+  selectors?: TSelectors;
   initialMap?: Map<string, TStates>;
   config?: StoreConfig;
 };
