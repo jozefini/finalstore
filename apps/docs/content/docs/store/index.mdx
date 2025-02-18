@@ -24,12 +24,20 @@ const store = createStore({
     user: null | User;
   },
   actions: {
-    setCount: (state, payload: number) => {
-      state.count = payload;
+    increment: (state) => {
+      state.count++;
     },
     setUser: (state, payload: User) => {
       state.user = payload;
     }
+  },
+  selectors: {
+    userInfo: (state) => ({
+      name: state.user?.name,
+      count: state.count
+    }),
+    isAdult: (state, minAge: number = 18) =>
+      state.user ? state.user.age >= minAge : false
   },
   config: {
     name: 'AppStore',
@@ -39,18 +47,38 @@ const store = createStore({
 
 // Use in components
 function Counter() {
-  const count = store.use((state) => state.count); // Reactive value
+  // Custom selector
+  const count = store.use((state) => state.count);
+
+  // Predefined selectors
+  const info = store.useSelector.userInfo();
+  const isAdult = store.useSelector.isAdult(21);
 
   return (
-    <button
-      onClick={() => {
-        const oldCount = store.get((state) => state.count); // Non-reactive value
-        store.dispatch('setCount', oldCount + 1); // Dispatch action
-      }}
-    >
-      Count: {count}
-    </button>
+    <div>
+      <button onClick={() => store.dispatch.increment()}>Count: {count}</button>
+      {info.name && (
+        <p>
+          User: {info.name}
+          {isAdult && ' (Adult)'}
+        </p>
+      )}
+    </div>
   );
+}
+
+// Get values outside components
+function logState() {
+  // Custom selector
+  const count = store.get((s) => s.count);
+
+  // Predefined selectors
+  const info = store.getSelector.userInfo();
+  const isAdult = store.getSelector.isAdult();
+
+  console.log(`Count: ${count}`);
+  console.log(`User: ${info.name || 'None'}`);
+  console.log(`Is Adult: ${isAdult}`);
 }
 ```
 
@@ -58,6 +86,8 @@ function Counter() {
 
 - Global & scoped state management
 - TypeScript-first
+- Predefined selectors with parameters
+- Custom selectors
 - Redux DevTools support
 - Deep equality checks for performance
 - Sync/async actions
