@@ -36,7 +36,7 @@ export function TodoControls() {
         <button
           onClick={() => {
             const taskId = store.get((s) => s.taskId);
-            collection.insert(taskId.toString(), {
+            collection.key(taskId.toString()).set({
               text: `Task ${taskId}`,
               completed: false
             });

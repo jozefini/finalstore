@@ -71,35 +71,43 @@ export type PayloadByAction<TStates, TActions> = {
 };
 export type CreateStoreProps<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, AnyType>>,
+  TActions extends Record<
+    string,
+    StoreActionFunction<TStates, AnyType>
+  > = Record<string, never>,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
-  >
+  > = Record<string, never>
 > = {
   states: TStates;
   actions: TActions;
-  selectors?: TSelectors;
+  selectors: TSelectors;
   config?: StoreConfig;
 };
 export type InferStore<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, AnyType>>,
+  TActions extends Record<
+    string,
+    StoreActionFunction<TStates, AnyType>
+  > = Record<string, never>,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
-  >
+  > = Record<string, never>
 > = {
-  dispatch: {
-    [K in keyof TActions]: TActions[K] extends StoreActionFunction<
-      TStates,
-      infer P
-    >
-      ? undefined extends P
-        ? () => void
-        : (payload: P) => void
-      : never;
-  };
+  dispatch: TActions extends Record<string, never>
+    ? Record<string, never>
+    : {
+        [K in keyof TActions]: TActions[K] extends StoreActionFunction<
+          TStates,
+          infer P
+        >
+          ? undefined extends P
+            ? () => void
+            : (payload: P) => void
+          : never;
+      };
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
@@ -155,7 +163,7 @@ export type CreateCollectionProps<
 > = {
   states: TStates;
   actions: TActions;
-  selectors?: TSelectors;
+  selectors: TSelectors;
   initialMap?: Map<string, TStates>;
   config?: StoreConfig;
 };
