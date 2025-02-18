@@ -38,28 +38,19 @@ type ActionFunction<TState, TPayload = undefined> = (
   payload: TPayload
 ) => void | Promise<void>;
 
-// type PayloadByAction<TStates, TActions> = {
-//   [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
-//     ? P
-//     : never;
-// };
-
-type SelectorFunction<TState, TResult, TPayload = undefined> = (
+type SelectorFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
-) => TResult;
+) => any;
 
 type CreateCollectionProps<
   TStates,
   TActions extends Record<string, ActionFunction<TStates, any>>,
-  TSelectors extends Record<
-    string,
-    SelectorFunction<TStates, any, any>
-  > = Record<string, never>
+  TSelectors extends Record<string, SelectorFunction<TStates, any>>
 > = {
   states: TStates;
   actions: TActions;
-  selectors?: TSelectors;
+  selectors: TSelectors;
   initialMap?: Map<string, TStates>;
   config?: {
     devtools?: boolean;
@@ -82,10 +73,10 @@ type CollectionSubscribers<States> = {
 type InferCollection<
   TStates,
   TActions,
-  TSelectors extends Record<
+  TSelectors extends Record<string, SelectorFunction<TStates, any>> = Record<
     string,
-    SelectorFunction<TStates, any, any>
-  > = Record<string, never>
+    never
+  >
 > = {
   clear: () => void;
   reset: () => void;
@@ -117,23 +108,21 @@ type InferCollection<
     getSelector: {
       [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
         TStates,
-        infer R,
         infer P
       >
         ? undefined extends P
-          ? () => R
-          : (payload: P) => R
+          ? () => ReturnType<TSelectors[K]>
+          : (payload: P) => ReturnType<TSelectors[K]>
         : never;
     };
     useSelector: {
       [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
         TStates,
-        infer R,
         infer P
       >
         ? undefined extends P
-          ? () => R
-          : (payload: P) => R
+          ? () => ReturnType<TSelectors[K]>
+          : (payload: P) => ReturnType<TSelectors[K]>
         : never;
     };
   };
@@ -146,10 +135,7 @@ type InferCollection<
 export function createCollection<
   States,
   Actions extends Record<string, ActionFunction<States, any>>,
-  Selectors extends Record<string, SelectorFunction<States, any, any>> = Record<
-    string,
-    never
-  >
+  Selectors extends Record<string, SelectorFunction<States, any>>
 >(
   props: CreateCollectionProps<States, Actions, Selectors>
 ): InferCollection<States, Actions, Selectors> {
@@ -516,7 +502,10 @@ export function createCollection<
 
     const [payload, shouldNotify = true] = args;
     const newState = { ...state };
-    const result = cb(newState, payload ?? (undefined as Actions[K]));
+    const result = cb(
+      newState,
+      payload ?? (undefined as unknown as Actions[K])
+    );
 
     // Handle async actions
     if (result instanceof Promise) {
@@ -626,7 +615,7 @@ export function createCollection<
 
       return Object.keys(props.selectors).reduce((acc, key) => {
         acc[key] = (payload?: any) => {
-          const selector = props.selectors![key];
+          const selector = props.selectors[key];
           const state = states.get(id);
           if (!state) return undefined;
 
