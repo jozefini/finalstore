@@ -1,0 +1,99 @@
+---
+title: set()
+icon: Parentheses
+---
+
+The `set()` method allows you to add or update items in your collection. Each item is identified by a unique key and follows the state structure defined when creating the collection.
+
+```tsx
+import { createCollection } from 'finalstore';
+
+const users = createCollection({
+  states: {
+    name: '',
+    age: 0,
+    active: true
+  },
+  actions: {}, // Required, even if empty
+  selectors: {} // Required, even if empty
+});
+```
+
+## Basic Usage
+
+```tsx
+// Add new user
+users.key('user-1').set({
+  name: 'John Doe',
+  age: 25,
+  active: true
+});
+
+// Update existing user
+users.key('user-1').set({
+  name: 'John Smith',
+  age: 26,
+  active: false
+});
+```
+
+## Inside Components
+
+```tsx
+function UserList() {
+  const userIds = users.useKeys();
+  const totalUsers = users.useSize();
+
+  const handleAddUser = () => {
+    const newId = `user-${totalUsers + 1}`;
+    users.key(newId).set({
+      name: 'New User',
+      age: 0,
+      active: true
+    });
+  };
+
+  return (
+    <div>
+      <h2>Users ({totalUsers})</h2>
+      <button onClick={handleAddUser}>Add User</button>
+      <ul>
+        {userIds.map((id) => (
+          <li key={id}>
+            <UserInfo id={id} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+## With Form Data
+
+```tsx
+function AddUserForm() {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const userId = `user-${Date.now()}`;
+    users.key(userId).set({
+      name: formData.get('name') as string,
+      age: Number(formData.get('age')),
+      active: true
+    });
+
+    form.reset();
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="name" placeholder="Name" required />
+      <input name="age" type="number" placeholder="Age" required />
+      <button type="submit">Add User</button>
+    </form>
+  );
+}
+```
