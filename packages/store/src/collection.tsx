@@ -38,17 +38,19 @@ type ActionFunction<TState, TPayload = undefined> = (
   payload: TPayload
 ) => void | Promise<void>;
 
-// type PayloadByAction<TStates, TActions> = {
-//   [K in keyof TActions]: TActions[K] extends ActionFunction<TStates, infer P>
-//     ? P
-//     : never;
-// };
+type SelectorFunction<TState, TPayload = undefined> = (
+  state: TState,
+  payload: TPayload
+) => any;
 
-type CreateCollectionProps<TStates, TActions> = {
+type CreateCollectionProps<
+  TStates,
+  TActions extends Record<string, ActionFunction<TStates, any>>,
+  TSelectors extends Record<string, SelectorFunction<TStates, any>>
+> = {
   states: TStates;
-  actions: {
-    [K in keyof TActions]: ActionFunction<TStates, TActions[K]>;
-  };
+  actions: TActions;
+  selectors: TSelectors;
   initialMap?: Map<string, TStates>;
   config?: {
     devtools?: boolean;
@@ -68,28 +70,62 @@ type CollectionSubscribers<States> = {
   keys: Map<number, Subscriber<string[]>>;
 };
 
-type InferCollection<TStates, TActions> = {
-  insert: (key: string, state: TStates) => void;
-  remove: (key: string) => void;
+type InferCollection<
+  TStates,
+  TActions,
+  TSelectors extends Record<string, SelectorFunction<TStates, any>> = Record<
+    string,
+    never
+  >
+> = {
   clear: () => void;
   reset: () => void;
-  use: {
-    (key: string): TStates | undefined;
-    <T>(key: string, selector: (state: TStates) => T): T;
-  };
   useSize: () => number;
   useKeys: () => string[];
-  get: {
-    (key: string): TStates | undefined;
-    <T>(key: string, selector: (state: TStates) => T): T;
-  };
   getSize: () => number;
   getKeys: () => string[];
-  dispatch: <K extends keyof TActions>(
-    key: string,
-    type: K,
-    ...args: ActionArgs<TActions[K]>
-  ) => Promise<void>;
+  key: (key: string) => {
+    dispatch: {
+      [K in keyof TActions]: TActions[K] extends ActionFunction<
+        TStates,
+        infer P
+      >
+        ? undefined extends P
+          ? () => void
+          : (payload: P) => void
+        : never;
+    };
+    remove: () => void;
+    set: (state: TStates) => void;
+    get: {
+      (): TStates | undefined;
+      <T>(selector: (state: TStates) => T): T;
+    };
+    use: {
+      (): TStates | undefined;
+      <T>(selector: (state: TStates) => T): T;
+    };
+    getSelector: {
+      [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
+        TStates,
+        infer P
+      >
+        ? undefined extends P
+          ? () => ReturnType<TSelectors[K]>
+          : (payload: P) => ReturnType<TSelectors[K]>
+        : never;
+    };
+    useSelector: {
+      [K in keyof TSelectors]: TSelectors[K] extends SelectorFunction<
+        TStates,
+        infer P
+      >
+        ? undefined extends P
+          ? () => ReturnType<TSelectors[K]>
+          : (payload: P) => ReturnType<TSelectors[K]>
+        : never;
+    };
+  };
 };
 
 // =====================
@@ -98,8 +134,11 @@ type InferCollection<TStates, TActions> = {
 
 export function createCollection<
   States,
-  Actions extends Record<string, unknown>
->(props: CreateCollectionProps<States, Actions>) {
+  Actions extends Record<string, ActionFunction<States, any>>,
+  Selectors extends Record<string, SelectorFunction<States, any>>
+>(
+  props: CreateCollectionProps<States, Actions, Selectors>
+): InferCollection<States, Actions, Selectors> {
   const initialMap = props.initialMap
     ? props.initialMap
     : new Map<string, States>();
@@ -288,14 +327,14 @@ export function createCollection<
   // Collection Operations
   // =====================
 
-  function insert(key: string, state: States) {
+  function set(key: string, state: States) {
     const hadKey = states.has(key);
     states.set(key, state);
 
     // Send to DevTools
     if (devTools && !pauseDevTools) {
       devTools.send(
-        { type: 'INSERT', payload: { key, state } },
+        { type: 'SET', payload: { key, state } },
         Object.fromEntries(states)
       );
     }
@@ -463,7 +502,10 @@ export function createCollection<
 
     const [payload, shouldNotify = true] = args;
     const newState = { ...state };
-    const result = cb(newState, payload ?? (undefined as Actions[K]));
+    const result = cb(
+      newState,
+      payload ?? (undefined as unknown as Actions[K])
+    );
 
     // Handle async actions
     if (result instanceof Promise) {
@@ -485,18 +527,126 @@ export function createCollection<
     }
   }
 
+  // Create dispatch object for a specific key
+  function createKeyDispatch(key: string) {
+    return Object.keys(actions).reduce((acc, actionKey) => {
+      acc[actionKey] = (payload?: any) => {
+        void dispatch(key, actionKey, payload);
+      };
+      return acc;
+    }, {} as any);
+  }
+
+  // Create key-specific get method
+  function createKeyGet(key: string) {
+    function get(): States | undefined;
+    function get<T>(selector: (state: States) => T): T;
+    function get<T>(selector?: (state: States) => T): States | T {
+      const state = states.get(key);
+      if (!state) return undefined as States;
+      if (!selector) return state;
+      return selector(state);
+    }
+    return get;
+  }
+
+  // Create key-specific use method
+  function createKeyUse(key: string) {
+    function use(): States | undefined;
+    function use<T>(selector: (state: States) => T): T;
+    function use<T>(selector?: (state: States) => T): States | T {
+      return useKey(key, selector);
+    }
+    return use;
+  }
+
+  // Rename existing use to useKey (internal function)
+  function useKey<T>(key: string, selector?: (state: States) => T): States | T {
+    const stateRef = useRef(states.get(key));
+    const selectorRef = useRef(selector);
+    const valueRef = useRef<T | States | undefined>(
+      selector && stateRef.current
+        ? selector(stateRef.current)
+        : stateRef.current
+    );
+
+    // Update refs when selector changes
+    if (selector !== selectorRef.current) {
+      selectorRef.current = selector;
+      stateRef.current = states.get(key);
+      valueRef.current =
+        selector && stateRef.current
+          ? selector(stateRef.current)
+          : stateRef.current;
+    }
+
+    const subscribeFn = useCallback(
+      (callback: () => void) => {
+        return subscribeToKey(key, callback, selectorRef.current);
+      },
+      [key]
+    );
+
+    const getSnapshot = useCallback(() => {
+      const currentState = states.get(key);
+      const hasStateChanged = currentState !== stateRef.current;
+
+      if (hasStateChanged || valueRef.current === undefined) {
+        stateRef.current = currentState;
+        valueRef.current =
+          selectorRef.current && currentState
+            ? selectorRef.current(currentState)
+            : currentState;
+      }
+
+      return valueRef.current;
+    }, [key]);
+
+    return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot) as
+      | T
+      | States;
+  }
+
+  // Update key method to include get and use
+  function key(id: string) {
+    // Create selector methods for both get and use
+    const createSelectorMethods = (useHook?: boolean) => {
+      if (!props.selectors) return {};
+
+      return Object.keys(props.selectors).reduce((acc, key) => {
+        acc[key] = (payload?: any) => {
+          const selector = props.selectors[key];
+          const state = states.get(id);
+          if (!state) return undefined;
+
+          if (useHook) {
+            return useKey(id, (s) => selector(s, payload));
+          }
+          return selector(state, payload);
+        };
+        return acc;
+      }, {} as any);
+    };
+
+    return {
+      dispatch: createKeyDispatch(id),
+      remove: () => remove(id),
+      set: (state: States) => set(id, state),
+      get: createKeyGet(id),
+      use: createKeyUse(id),
+      getSelector: createSelectorMethods(false),
+      useSelector: createSelectorMethods(true)
+    };
+  }
+
   return {
-    insert,
-    remove,
     clear,
     reset,
-    use,
     useSize,
     useKeys,
-    get,
     getSize,
     getKeys,
-    dispatch
+    key
   };
 }
 
@@ -506,14 +656,17 @@ export function createCollection<
 
 export function createScopedCollection<
   States,
-  Actions extends Record<string, unknown>
->(props: CreateCollectionProps<States, Actions>) {
-  const StoreContext = createContext<InferCollection<States, Actions> | null>(
-    null
-  );
+  Actions extends Record<string, ActionFunction<States, any>>,
+  Selectors extends Record<string, SelectorFunction<States, any>>
+>(props: CreateCollectionProps<States, Actions, Selectors>) {
+  const StoreContext = createContext<InferCollection<
+    States,
+    Actions,
+    Selectors
+  > | null>(null);
   const Provider = ({ children }: { children: ReactNode }) => {
     const store = useMemo(
-      () => createCollection<States, Actions>(props),
+      () => createCollection<States, Actions, Selectors>(props),
       [props]
     );
     useEffect(() => {
@@ -523,7 +676,7 @@ export function createScopedCollection<
     }, [store]);
     return createElement(StoreContext.Provider, { value: store }, children);
   };
-  function useStore(): InferCollection<States, Actions> {
+  function useStore(): InferCollection<States, Actions, Selectors> {
     const context = useContext(StoreContext);
     if (!context) {
       throw new Error('useStore must be used within a StoreProvider');
