@@ -2,12 +2,7 @@
 
 import { useRef } from 'react';
 
-// Concept:
-// Instead of returning dispatch as function,
-// we return as object with methods defined as actions
-// The existing dispatch function should be removed
-import { createCollection } from './collection-new';
-import { createStore } from './store';
+import { createCollection, createStore } from './index';
 
 export const concept = createStore({
   states: {
@@ -58,13 +53,14 @@ const collection = createCollection({
     text: (state, text: string) => {
       state.text = text;
     }
+  },
+  selectors: {
+    isCompleted: (state) => {
+      return state.completed;
+    }
   }
 });
 
-// Instead of returning dispatch as function,
-// we return as object with methods defined as actions
-// The existing dispatch function should be removed
-// Here how it should work:
 collection.key('1').dispatch.toggle();
 collection.key('1').dispatch.text('New text');
 

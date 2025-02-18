@@ -1,6 +1,6 @@
 'use client';
 
-import { store, collection } from '../../lib/store';
+import { collection, store } from '../../lib/store';
 
 const CollectionStats = () => {
   const size = collection.useSize();
@@ -40,7 +40,7 @@ export function TodoControls() {
               text: `Task ${taskId}`,
               completed: false
             });
-            store.dispatch('incrementTaskId');
+            store.dispatch.incrementTaskId();
           }}
           className="bg-fd-primary text-fd-primary-foreground cursor-pointer rounded-md px-4 py-2 hover:opacity-90"
         >
@@ -50,7 +50,7 @@ export function TodoControls() {
         <button
           onClick={() => {
             collection.clear();
-            store.dispatch('resetTaskId');
+            store.dispatch.resetTaskId();
           }}
           className="border-fd-border text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground cursor-pointer rounded-md border px-4 py-2"
         >

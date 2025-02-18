@@ -15,7 +15,7 @@ const TextInput = () => {
     <input
       type="text"
       value={text}
-      onChange={(e) => store.dispatch('setText', e.target.value)}
+      onChange={(e) => store.dispatch.setText(e.target.value)}
       className="border-fd-border w-full cursor-text rounded-md border bg-transparent px-4 py-2"
     />
   );
