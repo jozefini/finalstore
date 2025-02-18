@@ -18,6 +18,9 @@ const settings = createStore({
     toggleTheme: (state) => {
       state.theme = state.theme === 'light' ? 'dark' : 'light';
     }
+  },
+  selectors: {
+    isDarkMode: (state) => state.theme === 'dark'
   }
 });
 
@@ -26,7 +29,7 @@ function App() {
 
   return (
     <div data-theme={theme}>
-      <button onClick={() => settings.dispatch('toggleTheme')}>
+      <button onClick={() => settings.dispatch.toggleTheme()}>
         Toggle Theme
       </button>
     </div>
@@ -48,6 +51,9 @@ const todos = createCollection({
     toggle: (state) => {
       state.completed = !state.completed;
     }
+  },
+  selectors: {
+    isCompleted: (state) => state.completed
   }
 });
 
@@ -73,7 +79,7 @@ function TodoItem({ id }: { id: string }) {
       <input
         type="checkbox"
         checked={todo.completed}
-        onChange={() => todos.dispatch(id, 'toggle')}
+        onChange={() => todos.key(id).dispatch.toggle()}
       />
       <span>{todo.text}</span>
     </li>
