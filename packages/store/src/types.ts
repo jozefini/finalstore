@@ -55,7 +55,7 @@ export type Subscriber<T> = {
 export type StoreActionFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
-) => void | Promise<void>;
+) => unknown | Promise<unknown>;
 
 export type StoreSelectorFunction<TState, TResult, TPayload = undefined> = (
   state: TState,
@@ -64,7 +64,8 @@ export type StoreSelectorFunction<TState, TResult, TPayload = undefined> = (
 export type PayloadByAction<TStates, TActions> = {
   [K in keyof TActions]: TActions[K] extends StoreActionFunction<
     TStates,
-    infer P
+    infer P,
+    any
   >
     ? P
     : never;
@@ -73,7 +74,7 @@ export type CreateStoreProps<
   TStates,
   TActions extends Record<
     string,
-    StoreActionFunction<TStates, AnyType>
+    StoreActionFunction<TStates, any, any>
   > = Record<string, never>,
   TSelectors extends Record<
     string,
@@ -88,16 +89,19 @@ export type CreateStoreProps<
 
 // Add a type helper to infer if an action is async
 export type InferActionReturnType<T> = T extends (
-  ...args: any[]
-) => Promise<void>
-  ? Promise<void>
-  : void;
+  state: any,
+  payload: any
+) => infer R
+  ? R extends Promise<any>
+    ? R
+    : R
+  : never;
 
 export type InferStore<
   TStates,
   TActions extends Record<
     string,
-    StoreActionFunction<TStates, AnyType>
+    StoreActionFunction<TStates, any, any>
   > = Record<string, never>,
   TSelectors extends Record<
     string,
@@ -107,12 +111,12 @@ export type InferStore<
   dispatch: {
     [K in keyof TActions]: (
       payload?: PayloadByAction<TStates, TActions>[K]
-    ) => InferActionReturnType<TActions[K]>;
+    ) => ReturnType<TActions[K]>;
   };
   silentDispatch: {
     [K in keyof TActions]: (
       payload?: PayloadByAction<TStates, TActions>[K]
-    ) => InferActionReturnType<TActions[K]>;
+    ) => ReturnType<TActions[K]>;
   };
   use: {
     (): TStates;
