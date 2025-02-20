@@ -12,7 +12,6 @@ import {
 } from 'react';
 
 import type {
-  ActionArgs,
   AnyType,
   CreateStoreProps,
   DevTools,

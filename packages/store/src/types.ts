@@ -3,20 +3,6 @@
 export type AnyType = any;
 
 // =====================
-// Type Helpers
-// =====================
-export type IsOptionalPayload<T> = unknown extends T
-  ? true
-  : undefined extends T
-    ? true
-    : false;
-
-export type ActionArgs<T> =
-  IsOptionalPayload<T> extends true
-    ? [payload?: T, shouldNotify?: boolean]
-    : [payload: T, shouldNotify?: boolean];
-
-// =====================
 // DevTools Types
 // =====================
 export type DevToolsMessage = {
@@ -64,18 +50,17 @@ export type StoreSelectorFunction<TState, TResult, TPayload = undefined> = (
 export type PayloadByAction<TStates, TActions> = {
   [K in keyof TActions]: TActions[K] extends StoreActionFunction<
     TStates,
-    infer P,
-    any
+    infer P
   >
     ? P
     : never;
 };
 export type CreateStoreProps<
   TStates,
-  TActions extends Record<
+  TActions extends Record<string, StoreActionFunction<TStates, any>> = Record<
     string,
-    StoreActionFunction<TStates, any, any>
-  > = Record<string, never>,
+    never
+  >,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
@@ -99,10 +84,10 @@ export type InferActionReturnType<T> = T extends (
 
 export type InferStore<
   TStates,
-  TActions extends Record<
+  TActions extends Record<string, StoreActionFunction<TStates, any>> = Record<
     string,
-    StoreActionFunction<TStates, any, any>
-  > = Record<string, never>,
+    never
+  >,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
@@ -158,7 +143,7 @@ export type InferStore<
 export type CollectionActionFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
-) => void | Promise<void>;
+) => unknown | Promise<unknown>;
 export type CollectionSelectorFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
@@ -186,7 +171,7 @@ export type CollectionSubscribers<States> = {
 
 export type InferCollection<
   TStates,
-  TActions,
+  TActions extends Record<string, CollectionActionFunction<TStates, AnyType>>,
   TSelectors extends Record<
     string,
     CollectionSelectorFunction<TStates, AnyType>
@@ -200,14 +185,18 @@ export type InferCollection<
   getKeys: () => string[];
   key: (key: string) => {
     dispatch: {
-      [K in keyof TActions]: TActions[K] extends CollectionActionFunction<
-        TStates,
-        infer P
-      >
-        ? undefined extends P
-          ? () => void
-          : (payload: P) => void
-        : never;
+      [K in keyof TActions]: (
+        payload?: TActions[K] extends CollectionActionFunction<TStates, infer P>
+          ? P
+          : never
+      ) => ReturnType<TActions[K]>;
+    };
+    silentDispatch: {
+      [K in keyof TActions]: (
+        payload?: TActions[K] extends CollectionActionFunction<TStates, infer P>
+          ? P
+          : never
+      ) => ReturnType<TActions[K]>;
     };
     remove: () => void;
     set: (state: TStates) => void;
