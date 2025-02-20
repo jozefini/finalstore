@@ -230,28 +230,37 @@ export function createStore<
     return selector(getState());
   }
 
-  // Update the dispatch object creation to handle the promise internally
-  const dispatchObject = Object.keys(actions).reduce((acc, actionKey) => {
-    acc[actionKey] = (payload?: AnyType) => {
-      void dispatch(actionKey, payload);
-    };
-    return acc;
-  }, {} as AnyType);
+  // Update the dispatch object creation to handle async actions
+  const createDispatchObject = (shouldNotify: boolean) =>
+    Object.keys(actions).reduce((acc, actionKey) => {
+      acc[actionKey] = (payload?: AnyType) => {
+        return dispatch(actionKey, payload, shouldNotify);
+      };
+      return acc;
+    }, {} as AnyType);
+
+  const dispatchObject = createDispatchObject(true);
+  const silentDispatchObject = createDispatchObject(false);
 
   async function dispatch<K extends keyof TActions>(
     type: K,
-    ...args: ActionArgs<PayloadByAction<TStates, TActions>[K]>
+    payload?: PayloadByAction<TStates, TActions>[K],
+    shouldNotify = true
   ): Promise<void> {
     const cb = actions[type];
     if (typeof cb !== 'function') return;
 
     const newState = { ...states };
-    const [payload, shouldNotify = true] = args;
     const result = cb(newState, payload);
 
     // Handle async actions
     if (result instanceof Promise) {
-      await result;
+      try {
+        await result;
+      } catch (error) {
+        console.error(`Error in async action ${String(type)}:`, error);
+        throw error; // Re-throw to allow error handling by caller
+      }
     }
 
     states = newState;
@@ -308,6 +317,7 @@ export function createStore<
 
   const baseStore = {
     dispatch: dispatchObject,
+    silentDispatch: silentDispatchObject,
     use,
     get,
     getSelector: getterMethods,

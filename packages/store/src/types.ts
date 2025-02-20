@@ -85,6 +85,14 @@ export type CreateStoreProps<
   selectors: TSelectors;
   config?: StoreConfig;
 };
+
+// Add a type helper to infer if an action is async
+export type InferActionReturnType<T> = T extends (
+  ...args: any[]
+) => Promise<void>
+  ? Promise<void>
+  : void;
+
 export type InferStore<
   TStates,
   TActions extends Record<
@@ -96,18 +104,16 @@ export type InferStore<
     StoreSelectorFunction<TStates, AnyType, AnyType>
   > = Record<string, never>
 > = {
-  dispatch: TActions extends Record<string, never>
-    ? Record<string, never>
-    : {
-        [K in keyof TActions]: TActions[K] extends StoreActionFunction<
-          TStates,
-          infer P
-        >
-          ? undefined extends P
-            ? () => void
-            : (payload: P) => void
-          : never;
-      };
+  dispatch: {
+    [K in keyof TActions]: (
+      payload?: PayloadByAction<TStates, TActions>[K]
+    ) => InferActionReturnType<TActions[K]>;
+  };
+  silentDispatch: {
+    [K in keyof TActions]: (
+      payload?: PayloadByAction<TStates, TActions>[K]
+    ) => InferActionReturnType<TActions[K]>;
+  };
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
