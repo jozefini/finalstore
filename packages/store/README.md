@@ -141,8 +141,6 @@ store.silentDispatch.updateSettings({ fontSize: 16 });
 
 #### Reset store
 
-Reset store to initial states.
-
 ```tsx
 store.reset();
 ```
