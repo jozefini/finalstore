@@ -16,7 +16,7 @@ bun add finalstore
 
 Intuitive state management for React applications with first-class TypeScript support. It offers both global stores and collection management with minimal boilerplate.
 
-#### Setup
+#### Setup store
 
 ```tsx
 import { createStore } from 'finalstore';
