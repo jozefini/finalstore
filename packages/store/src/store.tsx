@@ -12,7 +12,6 @@ import {
 } from 'react';
 
 import type {
-  ActionArgs,
   AnyType,
   CreateStoreProps,
   DevTools,
@@ -230,29 +229,54 @@ export function createStore<
     return selector(getState());
   }
 
-  // Update the dispatch object creation to handle the promise internally
-  const dispatchObject = Object.keys(actions).reduce((acc, actionKey) => {
-    acc[actionKey] = (payload?: AnyType) => {
-      void dispatch(actionKey, payload);
-    };
-    return acc;
-  }, {} as AnyType);
+  // Update the dispatch object creation to handle both sync and async actions
+  const createDispatchObject = (shouldNotify: boolean) =>
+    Object.keys(actions).reduce((acc, actionKey) => {
+      acc[actionKey] = (payload?: AnyType) => {
+        const cb = actions[actionKey];
+        const newState = { ...states };
+        const result = cb(newState, payload);
 
+        if (result instanceof Promise) {
+          // For async actions, return the Promise chain
+          return dispatch(actionKey, payload, shouldNotify);
+        } else {
+          // For sync actions, execute immediately and return the result
+          states = newState;
+
+          // Send to DevTools
+          if (devTools && !pauseDevTools) {
+            devTools.send({ type: String(actionKey), payload }, states);
+          }
+
+          if (shouldNotify) {
+            notify();
+          }
+
+          return result;
+        }
+      };
+      return acc;
+    }, {} as AnyType);
+
+  const dispatchObject = createDispatchObject(true);
+  const silentDispatchObject = createDispatchObject(false);
+
+  // Modify dispatch to handle only async actions
   async function dispatch<K extends keyof TActions>(
     type: K,
-    ...args: ActionArgs<PayloadByAction<TStates, TActions>[K]>
-  ): Promise<void> {
+    payload?: PayloadByAction<TStates, TActions>[K],
+    shouldNotify = true
+  ): Promise<ReturnType<TActions[K]>> {
     const cb = actions[type];
-    if (typeof cb !== 'function') return;
+    if (typeof cb !== 'function')
+      throw new Error(`Action ${String(type)} not found`);
 
     const newState = { ...states };
-    const [payload, shouldNotify = true] = args;
     const result = cb(newState, payload);
 
-    // Handle async actions
-    if (result instanceof Promise) {
-      await result;
-    }
+    // We know this is async at this point
+    const finalResult = await result;
 
     states = newState;
 
@@ -264,6 +288,8 @@ export function createStore<
     if (shouldNotify) {
       notify();
     }
+
+    return finalResult as ReturnType<TActions[K]>;
   }
 
   function reset() {
@@ -308,6 +334,7 @@ export function createStore<
 
   const baseStore = {
     dispatch: dispatchObject,
+    silentDispatch: silentDispatchObject,
     use,
     get,
     getSelector: getterMethods,

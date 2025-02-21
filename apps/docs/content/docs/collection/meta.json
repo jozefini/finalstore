@@ -6,6 +6,7 @@
     "set",
     "get",
     "use",
+    "dispatch",
     "remove",
     "getSize",
     "getKeys",

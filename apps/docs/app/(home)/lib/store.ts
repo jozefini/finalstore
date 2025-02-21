@@ -31,7 +31,8 @@ export const store = createStore({
     setText: (state, text: string) => {
       state.text = text;
     }
-  }
+  },
+  selectors: {}
 });
 
 export const collection = createCollection({
@@ -43,5 +44,6 @@ export const collection = createCollection({
     toggle: (state) => {
       state.completed = !state.completed;
     }
-  }
+  },
+  selectors: {}
 });
