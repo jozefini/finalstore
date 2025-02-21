@@ -3,7 +3,7 @@ title: dispatch()
 icon: Parentheses
 ---
 
-The `dispatch()` method is used to trigger state updates through predefined actions. It supports both synchronous and asynchronous actions, and can optionally skip notifications to prevent unnecessary re-renders.
+The `dispatch()` method is used to trigger state updates through predefined actions. It supports both synchronous and asynchronous actions, and can return values from the actions.
 
 ```tsx
 import { createStore } from 'finalstore';
@@ -14,49 +14,57 @@ const store = createStore({
     user: null as { name: string } | null
   },
   actions: {
+    // Sync action with no return
     increment: (state) => {
       state.count++;
     },
+    // Sync action with return
     setUser: (state, payload: { name: string }) => {
       state.user = payload;
+      return 'success';
     },
+    // Async action with return
     fetchUser: async (state, id: string) => {
-      state.user = await api.getUser(id);
+      const user = await api.getUser(id);
+      state.user = user;
+      return user;
     }
   },
-  selectors: {} // Required, even if empty
+  selectors: {}
 });
 ```
 
 ## Basic Usage
 
 ```tsx
-// Without payload
+// Sync action with no return
 store.dispatch.increment();
 
-// With payload
-store.dispatch.setUser({ name: 'John' });
+// Sync action with return value
+const result = store.dispatch.setUser({ name: 'John' }); // 'success'
 ```
 
 ## Async Actions
 
 ```tsx
 async function loadUser(id: string) {
-  // Handles async actions automatically
-  await store.dispatch.fetchUser(id);
-  console.log(
-    'User loaded:',
-    store.get((s) => s.user)
-  );
+  // Returns the user from the async action
+  const user = await store.dispatch.fetchUser(id);
+  console.log('User loaded:', user);
 }
 ```
 
-## Optional Notification
+## Silent Dispatch
+
+For cases where you want to update state without triggering re-renders:
 
 ```tsx
-// Skip notification (prevents re-renders)
-store.dispatch('increment', undefined, false);
+// Using silentDispatch
+store.silentDispatch.increment();
+store.silentDispatch.setUser({ name: 'John' });
 
-// With payload, skip notification (prevents re-renders)
-store.dispatch('setUser', { name: 'John' }, false);
+// Async actions also work with silentDispatch
+await store.silentDispatch.fetchUser('123');
 ```
+
+The return values work the same way with both `dispatch` and `silentDispatch`.

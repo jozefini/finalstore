@@ -3,20 +3,6 @@
 export type AnyType = any;
 
 // =====================
-// Type Helpers
-// =====================
-export type IsOptionalPayload<T> = unknown extends T
-  ? true
-  : undefined extends T
-    ? true
-    : false;
-
-export type ActionArgs<T> =
-  IsOptionalPayload<T> extends true
-    ? [payload?: T, shouldNotify?: boolean]
-    : [payload: T, shouldNotify?: boolean];
-
-// =====================
 // DevTools Types
 // =====================
 export type DevToolsMessage = {
@@ -55,7 +41,7 @@ export type Subscriber<T> = {
 export type StoreActionFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
-) => void | Promise<void>;
+) => unknown | Promise<unknown>;
 
 export type StoreSelectorFunction<TState, TResult, TPayload = undefined> = (
   state: TState,
@@ -71,10 +57,10 @@ export type PayloadByAction<TStates, TActions> = {
 };
 export type CreateStoreProps<
   TStates,
-  TActions extends Record<
+  TActions extends Record<string, StoreActionFunction<TStates, any>> = Record<
     string,
-    StoreActionFunction<TStates, AnyType>
-  > = Record<string, never>,
+    never
+  >,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
@@ -85,29 +71,38 @@ export type CreateStoreProps<
   selectors: TSelectors;
   config?: StoreConfig;
 };
+
+// Add a type helper to infer if an action is async
+export type InferActionReturnType<T> = T extends (
+  state: any,
+  payload: any
+) => infer R
+  ? R extends Promise<any>
+    ? R
+    : R
+  : never;
+
 export type InferStore<
   TStates,
-  TActions extends Record<
+  TActions extends Record<string, StoreActionFunction<TStates, any>> = Record<
     string,
-    StoreActionFunction<TStates, AnyType>
-  > = Record<string, never>,
+    never
+  >,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
   > = Record<string, never>
 > = {
-  dispatch: TActions extends Record<string, never>
-    ? Record<string, never>
-    : {
-        [K in keyof TActions]: TActions[K] extends StoreActionFunction<
-          TStates,
-          infer P
-        >
-          ? undefined extends P
-            ? () => void
-            : (payload: P) => void
-          : never;
-      };
+  dispatch: {
+    [K in keyof TActions]: (
+      payload?: PayloadByAction<TStates, TActions>[K]
+    ) => ReturnType<TActions[K]>;
+  };
+  silentDispatch: {
+    [K in keyof TActions]: (
+      payload?: PayloadByAction<TStates, TActions>[K]
+    ) => ReturnType<TActions[K]>;
+  };
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
@@ -148,7 +143,7 @@ export type InferStore<
 export type CollectionActionFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
-) => void | Promise<void>;
+) => unknown | Promise<unknown>;
 export type CollectionSelectorFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
@@ -176,7 +171,7 @@ export type CollectionSubscribers<States> = {
 
 export type InferCollection<
   TStates,
-  TActions,
+  TActions extends Record<string, CollectionActionFunction<TStates, AnyType>>,
   TSelectors extends Record<
     string,
     CollectionSelectorFunction<TStates, AnyType>
@@ -190,14 +185,18 @@ export type InferCollection<
   getKeys: () => string[];
   key: (key: string) => {
     dispatch: {
-      [K in keyof TActions]: TActions[K] extends CollectionActionFunction<
-        TStates,
-        infer P
-      >
-        ? undefined extends P
-          ? () => void
-          : (payload: P) => void
-        : never;
+      [K in keyof TActions]: (
+        payload?: TActions[K] extends CollectionActionFunction<TStates, infer P>
+          ? P
+          : never
+      ) => ReturnType<TActions[K]>;
+    };
+    silentDispatch: {
+      [K in keyof TActions]: (
+        payload?: TActions[K] extends CollectionActionFunction<TStates, infer P>
+          ? P
+          : never
+      ) => ReturnType<TActions[K]>;
     };
     remove: () => void;
     set: (state: TStates) => void;

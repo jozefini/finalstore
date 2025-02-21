@@ -12,7 +12,6 @@ import {
 
 import { isDeepEqual } from './store';
 import type {
-  ActionArgs,
   AnyType,
   CollectionActionFunction,
   CollectionSelectorFunction,
@@ -296,9 +295,7 @@ export function createCollection<
   // Hooks and Methods
   // =====================
 
-  function use(key: string): States | undefined;
-  function use<T>(key: string, selector: (state: States) => T): T;
-  function use<T>(key: string, selector?: (state: States) => T): States | T {
+  function useKey<T>(key: string, selector?: (state: States) => T): States | T {
     const stateRef = useRef(states.get(key));
     const selectorRef = useRef(selector);
     const valueRef = useRef<T | States | undefined>(
@@ -386,28 +383,24 @@ export function createCollection<
   async function dispatch<K extends keyof Actions>(
     key: string,
     type: K,
-    ...args: ActionArgs<Actions[K]>
-  ): Promise<void> {
+    payload?: Actions[K] extends CollectionActionFunction<States, infer P>
+      ? P
+      : never,
+    shouldNotify = true
+  ): Promise<ReturnType<Actions[K]>> {
     const state = states.get(key);
-    if (!state) return;
+    if (!state) throw new Error(`Key ${key} not found`);
+
     const cb = actions[type];
-    if (typeof cb !== 'function') return;
+    if (typeof cb !== 'function')
+      throw new Error(`Action ${String(type)} not found`);
 
-    const [payload, shouldNotify = true] = args;
     const newState = { ...state };
-    const result = cb(
-      newState,
-      payload ?? (undefined as unknown as Actions[K])
-    );
-
-    // Handle async actions
-    if (result instanceof Promise) {
-      await result;
-    }
+    const result = cb(newState, payload);
+    const finalResult = result instanceof Promise ? await result : result;
 
     states.set(key, newState);
 
-    // Send to DevTools
     if (devTools && !pauseDevTools) {
       devTools.send(
         { type: `${String(type)}@${key}`, payload },
@@ -418,13 +411,35 @@ export function createCollection<
     if (shouldNotify) {
       notifyKeySubscribers(key);
     }
+
+    return finalResult as ReturnType<Actions[K]>;
   }
 
-  // Create dispatch object for a specific key
-  function createKeyDispatch(key: string) {
+  function createKeyDispatch(key: string, shouldNotify = true) {
     return Object.keys(actions).reduce((acc, actionKey) => {
       acc[actionKey] = (payload?: AnyType) => {
-        void dispatch(key, actionKey, payload);
+        const cb = actions[actionKey];
+        const state = states.get(key);
+        if (!state) throw new Error(`Key ${key} not found`);
+
+        const newState = { ...state };
+
+        if (cb.constructor.name === 'AsyncFunction') {
+          return dispatch(key, actionKey, payload, shouldNotify);
+        } else {
+          const result = cb(newState, payload);
+          states.set(key, newState);
+          if (devTools && !pauseDevTools) {
+            devTools.send(
+              { type: `${String(actionKey)}@${key}`, payload },
+              Object.fromEntries(states)
+            );
+          }
+          if (shouldNotify) {
+            notifyKeySubscribers(key);
+          }
+          return result;
+        }
       };
       return acc;
     }, {} as AnyType);
@@ -445,84 +460,32 @@ export function createCollection<
 
   // Create key-specific use method
   function createKeyUse(key: string) {
-    function use(): States | undefined;
-    function use<T>(selector: (state: States) => T): T;
-    function use<T>(selector?: (state: States) => T): States | T {
+    return function use<T>(selector?: (state: States) => T): States | T {
       return useKey(key, selector);
-    }
-    return use;
-  }
-
-  // Rename existing use to useKey (internal function)
-  function useKey<T>(key: string, selector?: (state: States) => T): States | T {
-    const stateRef = useRef(states.get(key));
-    const selectorRef = useRef(selector);
-    const valueRef = useRef<T | States | undefined>(
-      selector && stateRef.current
-        ? selector(stateRef.current)
-        : stateRef.current
-    );
-
-    // Update refs when selector changes
-    if (selector !== selectorRef.current) {
-      selectorRef.current = selector;
-      stateRef.current = states.get(key);
-      valueRef.current =
-        selector && stateRef.current
-          ? selector(stateRef.current)
-          : stateRef.current;
-    }
-
-    const subscribeFn = useCallback(
-      (callback: () => void) => {
-        return subscribeToKey(key, callback, selectorRef.current);
-      },
-      [key]
-    );
-
-    const getSnapshot = useCallback(() => {
-      const currentState = states.get(key);
-      const hasStateChanged = currentState !== stateRef.current;
-
-      if (hasStateChanged || valueRef.current === undefined) {
-        stateRef.current = currentState;
-        valueRef.current =
-          selectorRef.current && currentState
-            ? selectorRef.current(currentState)
-            : currentState;
-      }
-
-      return valueRef.current;
-    }, [key]);
-
-    return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot) as
-      | T
-      | States;
-  }
-
-  // Update key method to include get and use
-  function key(id: string) {
-    // Create selector methods for both get and use
-    const createSelectorMethods = (useHook?: boolean) => {
-      if (!props.selectors) return {};
-
-      return Object.keys(props.selectors).reduce((acc, key) => {
-        acc[key] = (payload?: AnyType) => {
-          const selector = props.selectors[key];
-          const state = states.get(id);
-          if (!state) return undefined;
-
-          if (useHook) {
-            return useKey(id, (s) => selector(s, payload));
-          }
-          return selector(state, payload);
-        };
-        return acc;
-      }, {} as AnyType);
     };
+  }
 
+  // Create selector methods for both get and use
+  function createSelectorMethods(useHook?: boolean) {
+    if (!props.selectors) return {};
+    return Object.keys(props.selectors).reduce((acc, key) => {
+      acc[key] = (payload?: AnyType) => {
+        const state = get(key);
+        if (!state) return undefined;
+
+        if (useHook) {
+          return useKey(key, (s: States) => props.selectors[key](s, payload));
+        }
+        return props.selectors[key](state, payload);
+      };
+      return acc;
+    }, {} as AnyType);
+  }
+
+  function key(id: string) {
     return {
-      dispatch: createKeyDispatch(id),
+      dispatch: createKeyDispatch(id, true),
+      silentDispatch: createKeyDispatch(id, false),
       remove: () => remove(id),
       set: (state: States) => set(id, state),
       get: createKeyGet(id),

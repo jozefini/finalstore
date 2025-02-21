@@ -3,7 +3,7 @@ title: dispatch()
 icon: Parentheses
 ---
 
-The `dispatch()` method triggers actions to update a specific item in your collection. It supports both synchronous and asynchronous actions, and can optionally skip notifications to prevent unnecessary re-renders.
+The `dispatch()` method triggers actions to update a specific item in your collection. It supports both synchronous and asynchronous actions, and can return values from the actions.
 
 ```tsx
 import { createCollection } from 'finalstore';
@@ -15,29 +15,65 @@ const users = createCollection({
     active: true
   },
   actions: {
+    // Sync action with no return
     updateName: (state, name: string) => {
       state.name = name;
     },
+    // Sync action with return
     toggleActive: (state) => {
       state.active = !state.active;
+      return state.active; // Returns the new state
     },
-    fetchUserData: (state, userId: string) => {
+    // Async action with return
+    fetchUserData: async (state, userId: string) => {
       const data = await api.fetchUser(userId);
       state.name = data.name;
       state.age = data.age;
+      return data; // Returns the fetched data
     }
-  }
+  },
+  selectors: {}
 });
-
-// Basic usage
-users.dispatch('user-1', 'updateName', 'John Doe');
-
-// Without payload
-users.dispatch('user-1', 'toggleActive');
-
-// With async action
-await users.dispatch('user-1', 'fetchUserData', 'user-1');
-
-// Skip notification (prevents re-renders)
-users.dispatch('user-1', 'updateName', 'John Smith', false);
 ```
+
+## Basic Usage
+
+```tsx
+// Using key() to access item-specific actions
+const userItem = users.key('user-1');
+
+// Sync action with no return
+userItem.dispatch.updateName('John Doe');
+
+// Sync action with return value
+const isActive = userItem.dispatch.toggleActive(); // Returns boolean
+```
+
+## Async Actions
+
+```tsx
+async function loadUser(id: string) {
+  // Returns the fetched data from the async action
+  const userData = await users.key(id).dispatch.fetchUserData(id);
+  console.log('User loaded:', userData);
+}
+```
+
+## Silent Dispatch
+
+For cases where you want to update state without triggering re-renders:
+
+```tsx
+const userItem = users.key('user-1');
+
+// Using silentDispatch
+userItem.silentDispatch.updateName('John Smith');
+
+// Return values work the same
+const isActive = userItem.silentDispatch.toggleActive();
+
+// Async actions also work with silentDispatch
+const userData = await userItem.silentDispatch.fetchUserData('user-1');
+```
+
+The return values work the same way with both `dispatch` and `silentDispatch`.

@@ -1,5 +1,13 @@
 # docs
 
+## 0.1.1
+
+### Patch Changes
+
+- Update store
+- Updated dependencies
+  - finalstore@1.1.2
+
 ## 0.1.0
 
 ### Minor Changes
