@@ -1,8 +1,4 @@
-# FinalStore
-
-Intuitive state management for React applications with first-class TypeScript support. It offers both global stores and collection management with minimal boilerplate.
-
-## Installation
+#### Installation
 
 ```bash
 # npm
@@ -18,104 +14,151 @@ yarn add finalstore
 bun add finalstore
 ```
 
-## Quick Example
+Intuitive state management for React applications with first-class TypeScript support. It offers both global stores and collection management with minimal boilerplate.
 
-### Store Example
+#### Setup
 
 ```tsx
 import { createStore } from 'finalstore';
 
-const settings = createStore({
+type StoreStates = {
+  theme: 'light' | 'dark';
+  sidebar: {
+    isOpen: boolean;
+    width: number;
+  };
+  notifications: {
+    id: string;
+    message: string;
+    type: 'info' | 'success' | 'error';
+  }[];
+  settings: {
+    fontSize: number;
+    language: string;
+    autoSave: boolean;
+  };
+};
+
+const store = createStore({
   states: {
     theme: 'light',
-    notifications: true
-  },
+    sidebar: {
+      isOpen: true,
+      width: 240
+    },
+    notifications: [],
+    settings: {
+      fontSize: 14,
+      language: 'en',
+      autoSave: true
+    }
+  } as StoreStates,
   actions: {
     toggleTheme: (state) => {
       state.theme = state.theme === 'light' ? 'dark' : 'light';
+      return state.theme;
+    },
+    setSidebarWidth: (state, width: number) => {
+      state.sidebar.width = Math.max(180, Math.min(width, 400));
+    },
+    fetchNotifications: async (state) => {
+      const response = await fetch('https://example.com/notifications');
+      const notifications = await response.json();
+      state.notifications = notifications;
+      return notifications;
+    },
+    addNotification: (
+      state,
+      notification: Omit<StoreStates['notifications'][0], 'id'>
+    ) => {
+      state.notifications.push({
+        ...notification,
+        id: crypto.randomUUID()
+      });
+    },
+    removeNotification: (state, id: string) => {
+      state.notifications = state.notifications.filter((n) => n.id !== id);
+    },
+    updateSettings: (state, settings: Partial<StoreStates['settings']>) => {
+      state.settings = { ...state.settings, ...settings };
     }
+  },
+  selectors: {
+    isDarkMode: (state) => state.theme === 'dark',
+    notificationCount: (state) => state.notifications.length,
+    hasNotificationType: (
+      state,
+      type: StoreStates['notifications'][0]['type']
+    ) => state.notifications.some((n) => n.type === type),
+    errorNotifications: (state) =>
+      state.notifications.filter((n) => n.type === 'error')
+  },
+  config: {
+    name: 'SiteStore',
+    devtools: true
   }
 });
-
-function App() {
-  const theme = settings.use((s) => s.theme);
-
-  return (
-    <div data-theme={theme}>
-      <button onClick={() => settings.dispatch('toggleTheme')}>
-        Toggle Theme
-      </button>
-    </div>
-  );
-}
 ```
 
-### Collection Example
+#### Get method `non-reactive`
 
 ```tsx
-import { createCollection } from 'finalstore';
+// Without selector (entire states)
+const states = store.get();
 
-const todos = createCollection({
-  states: {
-    text: '',
-    completed: false
-  },
-  actions: {
-    toggle: (state) => {
-      state.completed = !state.completed;
-    }
-  }
-});
+// With selector (specific state)
+const theme = store.get((states) => states.theme);
+const [theme] = store.get((states) => [states.theme]);
+const { theme } = store.get((states) => ({ theme: states.theme }));
 
-function TodoList() {
-  const todoIds = todos.useKeys();
+// With predefined selector
+const isDarkMode = store.getSelector.isDarkMode();
+const hasErrorNotification = store.getSelector.hasNotificationType('error');
+```
 
-  return (
-    <ul>
-      {todoIds.map((id) => (
-        <TodoItem key={id} id={id} />
-      ))}
-    </ul>
-  );
-}
+#### Use method `reactive`
 
-function TodoItem({ id }: { id: string }) {
-  const todo = todos.use(id);
+```tsx
+function Component() {
+  // Without selector (entire states)
+  const states = store.use();
 
-  if (!todo) return null;
+  // With selector (specific state)
+  const theme = store.use((states) => states.theme);
+  const [theme] = store.use((states) => [states.theme]);
+  const { theme } = store.use((states) => ({ theme: states.theme }));
 
-  return (
-    <li>
-      <input
-        type="checkbox"
-        checked={todo.completed}
-        onChange={() => todos.dispatch(id, 'toggle')}
-      />
-      <span>{todo.text}</span>
-    </li>
-  );
+  // With predefined selector
+  const isDarkMode = store.useSelector.isDarkMode();
+  const hasErrorNotification = store.useSelector.hasNotificationType('error');
+
+  return ( ... )
 }
 ```
 
-## Features
+#### Dispatch actions `reactive` and `non-reactive`
 
-- **Type Safety**: Full TypeScript support with type inference for states and actions
-- **Collection Management**: Efficient handling of dynamic collections with individual item subscriptions
-- **Zero Config**: No providers needed for global stores, just create and use
-- **DevTools Integration**: Built-in Redux DevTools support for debugging
+```tsx
+// Synchronous reactive actions
+store.dispatch.toggleTheme();
+store.dispatch.setSidebarWidth(300);
+store.dispatch.addNotification({ message: 'Hello World', type: 'info' });
 
-## Core Concepts
+// Asynchronous reactive actions
+await store.dispatch.fetchNotifications();
 
-- **States**: Global state management for app-wide data
-- **Collections**: Map-based state management for dynamic data sets
-- **Scoped State**: Component-level state isolation
-- **Type Safety**: First-class TypeScript support
+// Dispatch reactive actions with return values
+const theme = store.dispatch.toggleTheme();
+const notifications = await store.dispatch.fetchNotifications();
 
-## Why FinalStore?
+// Dispatch non-reactive actions
+store.silentDispatch.updateSettings({ fontSize: 16 });
+```
 
-- 🎯 **Simple API**: Intuitive methods that feel natural in React
-- 🔒 **Type Safe**: Built with TypeScript for robust development
-- 🎮 **DevTools**: Built-in Redux DevTools support
-- 🔄 **Reactive**: Automatic updates with granular subscriptions
-- 🎨 **Flexible**: Global, collection, and scoped state patterns
-- 🚀 **Performant**: Optimized renders with deep equality checks
+#### Reset store
+
+Reset store to initial states.
+
+```tsx
+store.reset();
+```
