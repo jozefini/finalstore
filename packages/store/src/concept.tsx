@@ -11,7 +11,11 @@ export const conceptWithoutSelectors = createStore({
     count: 0,
     text: 'Hello'
   },
-  actions: {}
+  actions: {
+    incrementTaskId: (state, payload: number) => {
+      state.taskId += payload;
+    }
+  }
 });
 export const concept = createStore({
   states: {
@@ -124,6 +128,7 @@ const TodoList = () => {
 export function Concept() {
   const isDarkTheme = concept.use((s) => s.theme === 'dark');
   const isLightTheme = concept.use.isTheme('light');
+  conceptWithoutSelectors.dispatch.incrementTaskId(10);
   const theme = concept.use((s) => s.theme);
 
   return (

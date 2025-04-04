@@ -67,7 +67,7 @@ export type CreateStoreProps<
   > = Record<string, never>
 > = {
   states: TStates;
-  actions: TActions;
+  actions?: TActions;
   selectors?: TSelectors;
   config?: StoreConfig;
 };
@@ -108,16 +108,20 @@ export type InferStore<
     StoreSelectorFunction<TStates, AnyType, AnyType>
   > = Record<string, never>
 > = {
-  dispatch: {
-    [K in keyof TActions]: (
-      payload?: PayloadByAction<TStates, TActions>[K]
-    ) => ReturnType<TActions[K]>;
-  };
-  silentDispatch: {
-    [K in keyof TActions]: (
-      payload?: PayloadByAction<TStates, TActions>[K]
-    ) => ReturnType<TActions[K]>;
-  };
+  dispatch: TActions extends Record<string, never>
+    ? Record<string, never>
+    : {
+        [K in keyof TActions]: (
+          payload?: PayloadByAction<TStates, TActions>[K]
+        ) => ReturnType<TActions[K]>;
+      };
+  silentDispatch: TActions extends Record<string, never>
+    ? Record<string, never>
+    : {
+        [K in keyof TActions]: (
+          payload?: PayloadByAction<TStates, TActions>[K]
+        ) => ReturnType<TActions[K]>;
+      };
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
