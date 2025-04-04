@@ -229,6 +229,24 @@ export function createStore<
     return selector(getState());
   }
 
+  // Create selector methods for use and get
+  const createSelectorMethods = (getStateFn: () => TStates) => {
+    return Object.keys(props.selectors).reduce(
+      (acc, key) => {
+        const selector = props.selectors[key];
+        acc[key] = (payload?: AnyType) => {
+          return selector(getStateFn(), payload);
+        };
+        return acc;
+      },
+      {} as Record<string, (payload?: AnyType) => AnyType>
+    );
+  };
+
+  // Create the use and get objects with both function and selector method support
+  const useWithSelectors = Object.assign(use, createSelectorMethods(getState));
+  const getWithSelectors = Object.assign(get, createSelectorMethods(getState));
+
   // Update the dispatch object creation to handle both sync and async actions
   const createDispatchObject = (shouldNotify: boolean) =>
     Object.keys(actions).reduce((acc, actionKey) => {
@@ -306,39 +324,11 @@ export function createStore<
     }
   }
 
-  // Create selector methods
-  function createSelectorMethods(
-    selectors: TSelectors,
-    getState: () => TStates,
-    useHook?: typeof use
-  ) {
-    return Object.keys(selectors).reduce((acc, key) => {
-      acc[key] = (payload?: AnyType) => {
-        if (useHook) {
-          return useHook((state: TStates) => selectors[key](state, payload));
-        }
-        return selectors[key](getState(), payload);
-      };
-      return acc;
-    }, {} as AnyType);
-  }
-
-  // In createStore, before returning:
-  const getterMethods = props.selectors
-    ? createSelectorMethods(props.selectors, getState)
-    : {};
-
-  const useMethods = props.selectors
-    ? createSelectorMethods(props.selectors, getState, use)
-    : {};
-
   const baseStore = {
     dispatch: dispatchObject,
     silentDispatch: silentDispatchObject,
-    use,
-    get,
-    getSelector: getterMethods,
-    useSelector: useMethods,
+    use: useWithSelectors,
+    get: getWithSelectors,
     reset
   } as const;
 

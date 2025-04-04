@@ -106,12 +106,7 @@ export type InferStore<
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
-  };
-  get: {
-    (): TStates;
-    <T>(selector: (state: TStates) => T): T;
-  };
-  getSelector: {
+  } & {
     [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
       TStates,
       infer R,
@@ -122,7 +117,10 @@ export type InferStore<
         : (payload: P) => R
       : never;
   };
-  useSelector: {
+  get: {
+    (): TStates;
+    <T>(selector: (state: TStates) => T): T;
+  } & {
     [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
       TStates,
       infer R,
