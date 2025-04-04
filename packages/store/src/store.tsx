@@ -227,9 +227,12 @@ export function createStore<
 
   // Create selector methods for use and get
   const createSelectorMethods = (getStateFn: () => TStates) => {
+    if (!props.selectors)
+      return {} as Record<string, (payload?: AnyType) => AnyType>;
+
     return Object.keys(props.selectors).reduce(
       (acc, key) => {
-        const selector = props.selectors[key];
+        const selector = props.selectors![key];
         acc[key] = (payload?: AnyType) => {
           return selector(getStateFn(), payload);
         };

@@ -4,6 +4,15 @@ import { useRef } from 'react';
 
 import { createCollection, createStore } from './index';
 
+export const conceptWithoutSelectors = createStore({
+  states: {
+    taskId: 1,
+    theme: 'light',
+    count: 0,
+    text: 'Hello'
+  },
+  actions: {}
+});
 export const concept = createStore({
   states: {
     taskId: 1,

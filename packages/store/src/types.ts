@@ -68,7 +68,7 @@ export type CreateStoreProps<
 > = {
   states: TStates;
   actions: TActions;
-  selectors: TSelectors;
+  selectors?: TSelectors;
   config?: StoreConfig;
 };
 
@@ -82,17 +82,20 @@ export type InferActionReturnType<T> = T extends (
     : R
   : never;
 
-export type SelectorMethods<TStates, TSelectors> = {
-  [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
-    TStates,
-    infer R,
-    infer P
-  >
-    ? undefined extends P
-      ? () => R
-      : (payload: P) => R
-    : never;
-};
+export type SelectorMethods<TStates, TSelectors> =
+  TSelectors extends Record<string, never>
+    ? Record<string, never>
+    : {
+        [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
+          TStates,
+          infer R,
+          infer P
+        >
+          ? undefined extends P
+            ? () => R
+            : (payload: P) => R
+          : never;
+      };
 
 export type InferStore<
   TStates,
