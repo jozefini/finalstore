@@ -82,6 +82,18 @@ export type InferActionReturnType<T> = T extends (
     : R
   : never;
 
+export type SelectorMethods<TStates, TSelectors> = {
+  [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
+    TStates,
+    infer R,
+    infer P
+  >
+    ? undefined extends P
+      ? () => R
+      : (payload: P) => R
+    : never;
+};
+
 export type InferStore<
   TStates,
   TActions extends Record<string, StoreActionFunction<TStates, any>> = Record<
@@ -106,31 +118,11 @@ export type InferStore<
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
-  } & {
-    [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
-      TStates,
-      infer R,
-      infer P
-    >
-      ? undefined extends P
-        ? () => R
-        : (payload: P) => R
-      : never;
-  };
+  } & SelectorMethods<TStates, TSelectors>;
   get: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
-  } & {
-    [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
-      TStates,
-      infer R,
-      infer P
-    >
-      ? undefined extends P
-        ? () => R
-        : (payload: P) => R
-      : never;
-  };
+  } & SelectorMethods<TStates, TSelectors>;
   reset: () => void;
 };
 

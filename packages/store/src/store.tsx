@@ -182,13 +182,11 @@ export function createStore<
     }
   }
 
-  function use(): TStates;
-  function use<T>(selector: (state: TStates) => T): T;
-  function use<T extends unknown[]>(selector: (state: TStates) => T): T;
-  function use<T>(selector?: (state: TStates) => T): TStates | T {
+  // Create the base use and get functions
+  const baseUse = (selector?: (state: TStates) => unknown) => {
     const stateRef = useRef(getState());
     const selectorRef = useRef(selector);
-    const valueRef = useRef<T | TStates>(
+    const valueRef = useRef<unknown>(
       selector ? selector(getState()) : getState()
     );
 
@@ -220,14 +218,12 @@ export function createStore<
     }, [selector]);
 
     return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot);
-  }
+  };
 
-  function get(): TStates;
-  function get<T>(selector: (state: TStates) => T): T;
-  function get<T>(selector?: (state: TStates) => T): TStates | T {
+  const baseGet = (selector?: (state: TStates) => unknown) => {
     if (!selector) return getState();
     return selector(getState());
-  }
+  };
 
   // Create selector methods for use and get
   const createSelectorMethods = (getStateFn: () => TStates) => {
@@ -244,8 +240,14 @@ export function createStore<
   };
 
   // Create the use and get objects with both function and selector method support
-  const useWithSelectors = Object.assign(use, createSelectorMethods(getState));
-  const getWithSelectors = Object.assign(get, createSelectorMethods(getState));
+  const useWithSelectors = Object.assign(
+    baseUse,
+    createSelectorMethods(getState)
+  );
+  const getWithSelectors = Object.assign(
+    baseGet,
+    createSelectorMethods(getState)
+  );
 
   // Update the dispatch object creation to handle both sync and async actions
   const createDispatchObject = (shouldNotify: boolean) =>
