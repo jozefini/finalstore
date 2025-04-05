@@ -13,25 +13,25 @@ import {
 import { isDeepEqual } from './store';
 import type {
   AnyType,
-  CollectionActionFunction,
-  CollectionSelectorFunction,
-  CollectionSelectorMethods,
-  CollectionSubscribers,
-  CreateCollectionProps,
-  InferCollection
+  CreateMapProps,
+  InferMap,
+  MapActionFunction,
+  MapSelectorFunction,
+  MapSelectorMethods,
+  MapSubscribers
 } from './types';
 
 // =====================
-// Collection
+// Map
 // =====================
 
-export function createCollection<
+export function createMap<
   States,
-  Actions extends Record<string, CollectionActionFunction<States, AnyType>>,
-  Selectors extends Record<string, CollectionSelectorFunction<States, AnyType>>
+  Actions extends Record<string, MapActionFunction<States, AnyType>>,
+  Selectors extends Record<string, MapSelectorFunction<States, AnyType>>
 >(
-  props: CreateCollectionProps<States, Actions, Selectors>
-): InferCollection<States, Actions, Selectors> {
+  props: CreateMapProps<States, Actions, Selectors>
+): InferMap<States, Actions, Selectors> {
   const initialMap = props.initialMap
     ? props.initialMap
     : new Map<string, States>();
@@ -46,7 +46,7 @@ export function createCollection<
   // Setup DevTools if enabled
   if (typeof window !== 'undefined' && props.config?.devtools) {
     const devToolsExtension = (window as AnyType).__REDUX_DEVTOOLS_EXTENSION__;
-    const devToolsName = props.config?.name || 'Collection';
+    const devToolsName = props.config?.name || 'Map';
     if (devToolsExtension) {
       devTools = devToolsExtension.connect({
         name: devToolsName,
@@ -91,7 +91,7 @@ export function createCollection<
     }
   }
 
-  const subscribers: CollectionSubscribers<States> = {
+  const subscribers: MapSubscribers<States> = {
     byKey: new Map(),
     size: new Map(),
     keys: new Map()
@@ -217,7 +217,7 @@ export function createCollection<
   }
 
   // =====================
-  // Collection Operations
+  // Map Operations
   // =====================
 
   function set(key: string, state: States) {
@@ -384,9 +384,7 @@ export function createCollection<
   async function dispatch<K extends keyof Actions>(
     key: string,
     type: K,
-    payload?: Actions[K] extends CollectionActionFunction<States, infer P>
-      ? P
-      : never,
+    payload?: Actions[K] extends MapActionFunction<States, infer P> ? P : never,
     shouldNotify = true
   ): Promise<ReturnType<Actions[K]>> {
     if (!actions) {
@@ -476,9 +474,8 @@ export function createCollection<
   function createSelectorMethods(
     key: string,
     useHook?: boolean
-  ): CollectionSelectorMethods<States, Selectors> {
-    if (!props.selectors)
-      return {} as CollectionSelectorMethods<States, Selectors>;
+  ): MapSelectorMethods<States, Selectors> {
+    if (!props.selectors) return {} as MapSelectorMethods<States, Selectors>;
     return Object.keys(props.selectors).reduce(
       (acc, selectorKey) => {
         acc[selectorKey] = (payload?: AnyType) => {
@@ -494,7 +491,7 @@ export function createCollection<
         };
         return acc;
       },
-      {} as CollectionSelectorMethods<States, Selectors>
+      {} as MapSelectorMethods<States, Selectors>
     );
   }
 
@@ -525,22 +522,22 @@ export function createCollection<
 }
 
 // =====================
-// Context Collection
+// Context Map
 // =====================
 
-export function createScopedCollection<
+export function createScopedMap<
   States,
-  Actions extends Record<string, CollectionActionFunction<States, AnyType>>,
-  Selectors extends Record<string, CollectionSelectorFunction<States, AnyType>>
->(props: CreateCollectionProps<States, Actions, Selectors>) {
-  const StoreContext = createContext<InferCollection<
+  Actions extends Record<string, MapActionFunction<States, AnyType>>,
+  Selectors extends Record<string, MapSelectorFunction<States, AnyType>>
+>(props: CreateMapProps<States, Actions, Selectors>) {
+  const StoreContext = createContext<InferMap<
     States,
     Actions,
     Selectors
   > | null>(null);
   const Provider = ({ children }: { children: ReactNode }) => {
     const store = useMemo(
-      () => createCollection<States, Actions, Selectors>(props),
+      () => createMap<States, Actions, Selectors>(props),
       [props]
     );
     useEffect(() => {
@@ -550,7 +547,7 @@ export function createScopedCollection<
     }, [store]);
     return createElement(StoreContext.Provider, { value: store }, children);
   };
-  function useStore(): InferCollection<States, Actions, Selectors> {
+  function useStore(): InferMap<States, Actions, Selectors> {
     const context = useContext(StoreContext);
     if (!context) {
       throw new Error('useStore must be used within a StoreProvider');

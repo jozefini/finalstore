@@ -134,26 +134,26 @@ export type InferStore<
 };
 
 // =====================
-// Collection Types
+// Map Types
 // =====================
 
-export type CollectionActionFunction<TState, TPayload = undefined> = (
+export type MapActionFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
 ) => unknown | Promise<unknown>;
-export type CollectionSelectorFunction<TState, TPayload = undefined> = (
+export type MapSelectorFunction<TState, TPayload = undefined> = (
   state: TState,
   payload: TPayload
 ) => AnyType;
-export type CreateCollectionProps<
+export type CreateMapProps<
   TStates,
-  TActions extends Record<
+  TActions extends Record<string, MapActionFunction<TStates, AnyType>> = Record<
     string,
-    CollectionActionFunction<TStates, AnyType>
-  > = Record<string, never>,
+    never
+  >,
   TSelectors extends Record<
     string,
-    CollectionSelectorFunction<TStates, AnyType>
+    MapSelectorFunction<TStates, AnyType>
   > = Record<string, never>
 > = {
   states: TStates;
@@ -163,11 +163,11 @@ export type CreateCollectionProps<
   config?: StoreConfig;
 };
 
-export type CollectionSelectorMethods<TStates, TSelectors> =
+export type MapSelectorMethods<TStates, TSelectors> =
   TSelectors extends Record<string, never>
     ? Record<string, never>
     : {
-        [K in keyof TSelectors]: TSelectors[K] extends CollectionSelectorFunction<
+        [K in keyof TSelectors]: TSelectors[K] extends MapSelectorFunction<
           TStates,
           infer P
         >
@@ -177,21 +177,21 @@ export type CollectionSelectorMethods<TStates, TSelectors> =
           : never;
       };
 
-export type CollectionSubscribers<States> = {
+export type MapSubscribers<States> = {
   byKey: Map<string, Map<number, Subscriber<States>>>;
   size: Map<number, Subscriber<number>>;
   keys: Map<number, Subscriber<string[]>>;
 };
 
-export type InferCollection<
+export type InferMap<
   TStates,
-  TActions extends Record<
+  TActions extends Record<string, MapActionFunction<TStates, AnyType>> = Record<
     string,
-    CollectionActionFunction<TStates, AnyType>
-  > = Record<string, never>,
+    never
+  >,
   TSelectors extends Record<
     string,
-    CollectionSelectorFunction<TStates, AnyType>
+    MapSelectorFunction<TStates, AnyType>
   > = Record<string, never>
 > = {
   clear: () => void;
@@ -205,10 +205,7 @@ export type InferCollection<
       ? Record<string, never>
       : {
           [K in keyof TActions]: (
-            payload?: TActions[K] extends CollectionActionFunction<
-              TStates,
-              infer P
-            >
+            payload?: TActions[K] extends MapActionFunction<TStates, infer P>
               ? P
               : never
           ) => ReturnType<TActions[K]>;
@@ -217,10 +214,7 @@ export type InferCollection<
       ? Record<string, never>
       : {
           [K in keyof TActions]: (
-            payload?: TActions[K] extends CollectionActionFunction<
-              TStates,
-              infer P
-            >
+            payload?: TActions[K] extends MapActionFunction<TStates, infer P>
               ? P
               : never
           ) => ReturnType<TActions[K]>;
@@ -230,10 +224,10 @@ export type InferCollection<
     get: {
       (): TStates | undefined;
       <T>(selector: (state: TStates) => T): T;
-    } & CollectionSelectorMethods<TStates, TSelectors>;
+    } & MapSelectorMethods<TStates, TSelectors>;
     use: {
       (): TStates | undefined;
       <T>(selector: (state: TStates) => T): T;
-    } & CollectionSelectorMethods<TStates, TSelectors>;
+    } & MapSelectorMethods<TStates, TSelectors>;
   };
 };
