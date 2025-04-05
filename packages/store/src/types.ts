@@ -57,10 +57,10 @@ export type PayloadByAction<TStates, TActions> = {
 };
 export type CreateStoreProps<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, any>> = Record<
+  TActions extends Record<
     string,
-    never
-  >,
+    StoreActionFunction<TStates, AnyType>
+  > = Record<string, never>,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
@@ -74,10 +74,10 @@ export type CreateStoreProps<
 
 // Add a type helper to infer if an action is async
 export type InferActionReturnType<T> = T extends (
-  state: any,
-  payload: any
+  state: AnyType,
+  payload: AnyType
 ) => infer R
-  ? R extends Promise<any>
+  ? R extends Promise<AnyType>
     ? R
     : R
   : never;
@@ -99,10 +99,10 @@ export type SelectorMethods<TStates, TSelectors> =
 
 export type InferStore<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, any>> = Record<
+  TActions extends Record<
     string,
-    never
-  >,
+    StoreActionFunction<TStates, AnyType>
+  > = Record<string, never>,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>

@@ -431,20 +431,19 @@ export function createMap<
 
         if (cb.constructor.name === 'AsyncFunction') {
           return dispatch(key, actionKey, payload, shouldNotify);
-        } else {
-          const result = cb(newState, payload);
-          states.set(key, newState);
-          if (devTools && !pauseDevTools) {
-            devTools.send(
-              { type: `${String(actionKey)}@${key}`, payload },
-              Object.fromEntries(states)
-            );
-          }
-          if (shouldNotify) {
-            notifyKeySubscribers(key);
-          }
-          return result;
         }
+        const result = cb(newState, payload);
+        states.set(key, newState);
+        if (devTools && !pauseDevTools) {
+          devTools.send(
+            { type: `${String(actionKey)}@${key}`, payload },
+            Object.fromEntries(states)
+          );
+        }
+        if (shouldNotify) {
+          notifyKeySubscribers(key);
+        }
+        return result;
       };
       return acc;
     }, {} as AnyType);
@@ -476,18 +475,24 @@ export function createMap<
     useHook?: boolean
   ): MapSelectorMethods<States, Selectors> {
     if (!props.selectors) return {} as MapSelectorMethods<States, Selectors>;
-    return Object.keys(props.selectors).reduce(
+    return Object.keys(props.selectors).reduce<
+      MapSelectorMethods<States, Selectors>
+    >(
       (acc, selectorKey) => {
-        acc[selectorKey] = (payload?: AnyType) => {
+        const selector = props.selectors?.[selectorKey];
+        if (!selector) return acc;
+
+        const typedKey = selectorKey as keyof Selectors;
+        (acc as Record<keyof Selectors, (payload?: AnyType) => AnyType>)[
+          typedKey
+        ] = (payload?: AnyType) => {
           const state = get(key);
           if (!state) return undefined;
 
           if (useHook) {
-            return useKey(key, (s: States) =>
-              props.selectors![selectorKey](s, payload)
-            );
+            return useKey(key, (s: States) => selector(s, payload));
           }
-          return props.selectors![selectorKey](state, payload);
+          return selector(state, payload);
         };
         return acc;
       },

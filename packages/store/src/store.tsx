@@ -232,7 +232,9 @@ export function createStore<
 
     return Object.keys(props.selectors).reduce(
       (acc, key) => {
-        const selector = props.selectors![key];
+        const selector = props.selectors?.[key];
+        if (!selector) return acc;
+
         acc[key] = (payload?: AnyType) => {
           return selector(getStateFn(), payload);
         };
@@ -264,21 +266,20 @@ export function createStore<
             if (result instanceof Promise) {
               // For async actions, return the Promise chain
               return dispatch(actionKey, payload, shouldNotify);
-            } else {
-              // For sync actions, execute immediately and return the result
-              states = newState;
-
-              // Send to DevTools
-              if (devTools && !pauseDevTools) {
-                devTools.send({ type: String(actionKey), payload }, states);
-              }
-
-              if (shouldNotify) {
-                notify();
-              }
-
-              return result;
             }
+            // For sync actions, execute immediately and return the result
+            states = newState;
+
+            // Send to DevTools
+            if (devTools && !pauseDevTools) {
+              devTools.send({ type: String(actionKey), payload }, states);
+            }
+
+            if (shouldNotify) {
+              notify();
+            }
+
+            return result;
           };
           return acc;
         }, {} as AnyType)
