@@ -350,11 +350,11 @@ export function createStore<
 
 export function createScopedStore<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, unknown>>,
+  TActions extends Record<string, StoreActionFunction<TStates, AnyType>>,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
-  > = Record<string, never>
+  >
 >(props: CreateStoreProps<TStates, TActions, TSelectors>) {
   type StoreType = InferStore<TStates, TActions, TSelectors>;
 
