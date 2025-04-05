@@ -45,5 +45,9 @@ export const collection = createCollection({
       state.completed = !state.completed;
     }
   },
-  selectors: {}
+  selectors: {
+    isCompleted: (state) => {
+      return state.completed;
+    }
+  }
 });

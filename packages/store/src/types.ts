@@ -147,18 +147,35 @@ export type CollectionSelectorFunction<TState, TPayload = undefined> = (
 ) => AnyType;
 export type CreateCollectionProps<
   TStates,
-  TActions extends Record<string, CollectionActionFunction<TStates, AnyType>>,
+  TActions extends Record<
+    string,
+    CollectionActionFunction<TStates, AnyType>
+  > = Record<string, never>,
   TSelectors extends Record<
     string,
     CollectionSelectorFunction<TStates, AnyType>
-  >
+  > = Record<string, never>
 > = {
   states: TStates;
-  actions: TActions;
-  selectors: TSelectors;
+  actions?: TActions;
+  selectors?: TSelectors;
   initialMap?: Map<string, TStates>;
   config?: StoreConfig;
 };
+
+export type CollectionSelectorMethods<TStates, TSelectors> =
+  TSelectors extends Record<string, never>
+    ? Record<string, never>
+    : {
+        [K in keyof TSelectors]: TSelectors[K] extends CollectionSelectorFunction<
+          TStates,
+          infer P
+        >
+          ? undefined extends P
+            ? () => ReturnType<TSelectors[K]>
+            : (payload: P) => ReturnType<TSelectors[K]>
+          : never;
+      };
 
 export type CollectionSubscribers<States> = {
   byKey: Map<string, Map<number, Subscriber<States>>>;
@@ -168,7 +185,10 @@ export type CollectionSubscribers<States> = {
 
 export type InferCollection<
   TStates,
-  TActions extends Record<string, CollectionActionFunction<TStates, AnyType>>,
+  TActions extends Record<
+    string,
+    CollectionActionFunction<TStates, AnyType>
+  > = Record<string, never>,
   TSelectors extends Record<
     string,
     CollectionSelectorFunction<TStates, AnyType>
@@ -181,49 +201,39 @@ export type InferCollection<
   getSize: () => number;
   getKeys: () => string[];
   key: (key: string) => {
-    dispatch: {
-      [K in keyof TActions]: (
-        payload?: TActions[K] extends CollectionActionFunction<TStates, infer P>
-          ? P
-          : never
-      ) => ReturnType<TActions[K]>;
-    };
-    silentDispatch: {
-      [K in keyof TActions]: (
-        payload?: TActions[K] extends CollectionActionFunction<TStates, infer P>
-          ? P
-          : never
-      ) => ReturnType<TActions[K]>;
-    };
+    dispatch: TActions extends Record<string, never>
+      ? Record<string, never>
+      : {
+          [K in keyof TActions]: (
+            payload?: TActions[K] extends CollectionActionFunction<
+              TStates,
+              infer P
+            >
+              ? P
+              : never
+          ) => ReturnType<TActions[K]>;
+        };
+    silentDispatch: TActions extends Record<string, never>
+      ? Record<string, never>
+      : {
+          [K in keyof TActions]: (
+            payload?: TActions[K] extends CollectionActionFunction<
+              TStates,
+              infer P
+            >
+              ? P
+              : never
+          ) => ReturnType<TActions[K]>;
+        };
     remove: () => void;
     set: (state: TStates) => void;
     get: {
       (): TStates | undefined;
       <T>(selector: (state: TStates) => T): T;
-    };
+    } & CollectionSelectorMethods<TStates, TSelectors>;
     use: {
       (): TStates | undefined;
       <T>(selector: (state: TStates) => T): T;
-    };
-    getSelector: {
-      [K in keyof TSelectors]: TSelectors[K] extends CollectionSelectorFunction<
-        TStates,
-        infer P
-      >
-        ? undefined extends P
-          ? () => ReturnType<TSelectors[K]>
-          : (payload: P) => ReturnType<TSelectors[K]>
-        : never;
-    };
-    useSelector: {
-      [K in keyof TSelectors]: TSelectors[K] extends CollectionSelectorFunction<
-        TStates,
-        infer P
-      >
-        ? undefined extends P
-          ? () => ReturnType<TSelectors[K]>
-          : (payload: P) => ReturnType<TSelectors[K]>
-        : never;
-    };
+    } & CollectionSelectorMethods<TStates, TSelectors>;
   };
 };

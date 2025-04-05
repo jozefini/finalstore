@@ -254,33 +254,35 @@ export function createStore<
 
   // Update the dispatch object creation to handle both sync and async actions
   const createDispatchObject = (shouldNotify: boolean) =>
-    Object.keys(actions).reduce((acc, actionKey) => {
-      acc[actionKey] = (payload?: AnyType) => {
-        const cb = actions[actionKey];
-        const newState = { ...states };
-        const result = cb(newState, payload);
+    actions
+      ? Object.keys(actions).reduce((acc, actionKey) => {
+          acc[actionKey] = (payload?: AnyType) => {
+            const cb = actions[actionKey];
+            const newState = { ...states };
+            const result = cb(newState, payload);
 
-        if (result instanceof Promise) {
-          // For async actions, return the Promise chain
-          return dispatch(actionKey, payload, shouldNotify);
-        } else {
-          // For sync actions, execute immediately and return the result
-          states = newState;
+            if (result instanceof Promise) {
+              // For async actions, return the Promise chain
+              return dispatch(actionKey, payload, shouldNotify);
+            } else {
+              // For sync actions, execute immediately and return the result
+              states = newState;
 
-          // Send to DevTools
-          if (devTools && !pauseDevTools) {
-            devTools.send({ type: String(actionKey), payload }, states);
-          }
+              // Send to DevTools
+              if (devTools && !pauseDevTools) {
+                devTools.send({ type: String(actionKey), payload }, states);
+              }
 
-          if (shouldNotify) {
-            notify();
-          }
+              if (shouldNotify) {
+                notify();
+              }
 
-          return result;
-        }
-      };
-      return acc;
-    }, {} as AnyType);
+              return result;
+            }
+          };
+          return acc;
+        }, {} as AnyType)
+      : {};
 
   const dispatchObject = createDispatchObject(true);
   const silentDispatchObject = createDispatchObject(false);
@@ -291,6 +293,7 @@ export function createStore<
     payload?: PayloadByAction<TStates, TActions>[K],
     shouldNotify = true
   ): Promise<ReturnType<TActions[K]>> {
+    if (!actions) throw new Error('Actions are not defined');
     const cb = actions[type];
     if (typeof cb !== 'function')
       throw new Error(`Action ${String(type)} not found`);

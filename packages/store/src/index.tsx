@@ -1,2 +1,2 @@
-export { createScopedStore, createStore } from './store';
+export { createScopedStore, createStore, isDeepEqual } from './store';
 export { createCollection, createScopedCollection } from './collection';

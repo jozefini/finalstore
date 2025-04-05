@@ -15,6 +15,7 @@ import type {
   AnyType,
   CollectionActionFunction,
   CollectionSelectorFunction,
+  CollectionSelectorMethods,
   CollectionSubscribers,
   CreateCollectionProps,
   InferCollection
@@ -388,12 +389,17 @@ export function createCollection<
       : never,
     shouldNotify = true
   ): Promise<ReturnType<Actions[K]>> {
+    if (!actions) {
+      throw new Error('Actions are not defined');
+    }
+
     const state = states.get(key);
     if (!state) throw new Error(`Key ${key} not found`);
 
     const cb = actions[type];
-    if (typeof cb !== 'function')
+    if (typeof cb !== 'function') {
       throw new Error(`Action ${String(type)} not found`);
+    }
 
     const newState = { ...state };
     const result = cb(newState, payload);
@@ -416,6 +422,7 @@ export function createCollection<
   }
 
   function createKeyDispatch(key: string, shouldNotify = true) {
+    if (!actions) return {} as Record<string, never>;
     return Object.keys(actions).reduce((acc, actionKey) => {
       acc[actionKey] = (payload?: AnyType) => {
         const cb = actions[actionKey];
@@ -466,32 +473,43 @@ export function createCollection<
   }
 
   // Create selector methods for both get and use
-  function createSelectorMethods(useHook?: boolean) {
-    if (!props.selectors) return {};
-    return Object.keys(props.selectors).reduce((acc, key) => {
-      acc[key] = (payload?: AnyType) => {
-        const state = get(key);
-        if (!state) return undefined;
+  function createSelectorMethods(
+    key: string,
+    useHook?: boolean
+  ): CollectionSelectorMethods<States, Selectors> {
+    if (!props.selectors)
+      return {} as CollectionSelectorMethods<States, Selectors>;
+    return Object.keys(props.selectors).reduce(
+      (acc, selectorKey) => {
+        acc[selectorKey] = (payload?: AnyType) => {
+          const state = get(key);
+          if (!state) return undefined;
 
-        if (useHook) {
-          return useKey(key, (s: States) => props.selectors[key](s, payload));
-        }
-        return props.selectors[key](state, payload);
-      };
-      return acc;
-    }, {} as AnyType);
+          if (useHook) {
+            return useKey(key, (s: States) =>
+              props.selectors![selectorKey](s, payload)
+            );
+          }
+          return props.selectors![selectorKey](state, payload);
+        };
+        return acc;
+      },
+      {} as CollectionSelectorMethods<States, Selectors>
+    );
   }
 
   function key(id: string) {
     return {
-      dispatch: createKeyDispatch(id, true),
-      silentDispatch: createKeyDispatch(id, false),
+      dispatch: actions
+        ? createKeyDispatch(id, true)
+        : ({} as Record<string, never>),
+      silentDispatch: actions
+        ? createKeyDispatch(id, false)
+        : ({} as Record<string, never>),
       remove: () => remove(id),
       set: (state: States) => set(id, state),
-      get: createKeyGet(id),
-      use: createKeyUse(id),
-      getSelector: createSelectorMethods(false),
-      useSelector: createSelectorMethods(true)
+      get: Object.assign(createKeyGet(id), createSelectorMethods(id, false)),
+      use: Object.assign(createKeyUse(id), createSelectorMethods(id, true))
     };
   }
 

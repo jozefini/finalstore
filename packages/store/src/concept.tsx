@@ -80,6 +80,7 @@ collection.key('1').dispatch.text('New text');
 const TodoItem = ({ id }: { id: string }) => {
   const text = collection.key(id).get((s) => s.text);
   const completed = collection.key(id).use((s) => s.completed);
+  const isCompleted = collection.key(id).use.isCompleted();
 
   return (
     <div>

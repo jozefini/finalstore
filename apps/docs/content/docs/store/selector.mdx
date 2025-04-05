@@ -25,14 +25,14 @@ const store = createStore({
 });
 ```
 
-## Inside Components (useSelector)
+## Inside Components (use)
 
-Use the `useSelector` for reactive state in components:
+Use the `use` for reactive state in components:
 
 ```tsx
 function TodoList({ showCompleted }: { showCompleted: boolean }) {
-  // Use useSelector for reactive updates
-  const todos = store.useSelector.filteredTodos(showCompleted);
+  // Use use for reactive updates
+  const todos = store.use.filteredTodos(showCompleted);
 
   return (
     <ul>
@@ -45,8 +45,8 @@ function TodoList({ showCompleted }: { showCompleted: boolean }) {
 
 function TodoStats() {
   // Both will trigger re-renders when their values change
-  const completedTodos = store.useSelector.filteredTodos(true);
-  const total = store.useSelector.totalTodos();
+  const completedTodos = store.use.filteredTodos(true);
+  const total = store.use.totalTodos();
 
   return (
     <div>
@@ -57,22 +57,22 @@ function TodoStats() {
 }
 ```
 
-## Outside Components (getSelector)
+## Outside Components (get)
 
-Use the `getSelector` for non-reactive state access:
+Use the `get` for non-reactive state access:
 
 ```tsx
 function handleTodoAction() {
   // Get current values synchronously
-  const completedTodos = store.getSelector.filteredTodos(true);
-  const total = store.getSelector.totalTodos();
+  const completedTodos = store.get.filteredTodos(true);
+  const total = store.get.totalTodos();
 
   console.log(`${completedTodos.length} of ${total} todos completed`);
 }
 
 // Can be used in async functions
 async function processTodos() {
-  const todos = store.getSelector.filteredTodos(true);
+  const todos = store.get.filteredTodos(true);
   await saveTodos(todos);
 }
 ```
@@ -87,6 +87,6 @@ Selectors are fully type-safe. TypeScript will ensure that:
 
 ```tsx
 // TypeScript will catch these errors:
-store.useSelector.nonexistentSelector(); // Error: Property doesn't exist
-store.getSelector.filteredTodos(123); // Error: Expected boolean | undefined
+store.use.nonexistentSelector(); // Error: Property doesn't exist
+store.get.filteredTodos(123); // Error: Expected boolean | undefined
 ```

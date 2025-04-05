@@ -3,7 +3,7 @@
 import { collection } from '../../lib/store';
 
 const TodoChecked = ({ id }: { id: string }) => {
-  const completed = collection.key(id).use((s) => s.completed);
+  const completed = collection.key(id).use.isCompleted();
 
   return (
     <input
@@ -17,7 +17,7 @@ const TodoChecked = ({ id }: { id: string }) => {
 
 const TodoText = ({ id }: { id: string }) => {
   const text = collection.key(id).use((s) => s.text);
-  const completed = collection.key(id).use((s) => s.completed);
+  const completed = collection.key(id).use.isCompleted();
 
   return (
     <span className={completed ? 'text-fd-muted-foreground line-through' : ''}>
