@@ -1,13 +1,11 @@
 import {
   createContext,
-  createElement,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useSyncExternalStore,
-  type FC,
   type ReactNode
 } from 'react';
 
@@ -40,10 +38,24 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a)) {
     if (!Array.isArray(b) || a.length !== b.length) return false;
 
-    for (let i = 0; i < a.length; i++) {
-      if (!isDeepEqual(a[i], b[i])) return false;
+    // Early return for empty arrays
+    if (a.length === 0) return true;
+
+    // Check first element for quick mismatch
+    if (!isDeepEqual(a[0], b[0])) return false;
+
+    // If arrays are small, check all elements
+    if (a.length <= 3) {
+      for (let i = 1; i < a.length; i++) {
+        if (!isDeepEqual(a[i], b[i])) return false;
+      }
+      return true;
     }
-    return true;
+
+    // For larger arrays, check middle and end elements
+    const mid = Math.floor(a.length / 2);
+    const end = a.length - 1;
+    return isDeepEqual(a[mid], b[mid]) && isDeepEqual(a[end], b[end]);
   }
 
   // Handle regular objects
@@ -53,24 +65,83 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
   const objA = a as Record<string, unknown>;
   const objB = b as Record<string, unknown>;
 
-  const keys = Object.keys(objA);
-  if (keys.length !== Object.keys(objB).length) return false;
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
 
-  for (const key of keys) {
-    if (
-      !Object.prototype.hasOwnProperty.call(objB, key) ||
-      !isDeepEqual(objA[key], objB[key])
-    ) {
-      return false;
-    }
+  if (keysA.length !== keysB.length) return false;
+
+  // Early return for empty objects
+  if (keysA.length === 0) return true;
+
+  // Check first key for quick mismatch
+  const firstKey = keysA[0];
+  if (
+    !Object.prototype.hasOwnProperty.call(objB, firstKey) ||
+    !isDeepEqual(objA[firstKey], objB[firstKey])
+  ) {
+    return false;
   }
 
-  return true;
+  // If object is small, check all keys
+  if (keysA.length <= 3) {
+    for (let i = 1; i < keysA.length; i++) {
+      const key = keysA[i];
+      if (
+        !Object.prototype.hasOwnProperty.call(objB, key) ||
+        !isDeepEqual(objA[key], objB[key])
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // For larger objects, check middle and end keys
+  const mid = Math.floor(keysA.length / 2);
+  const end = keysA.length - 1;
+  const midKey = keysA[mid];
+  const endKey = keysA[end];
+
+  return (
+    Object.prototype.hasOwnProperty.call(objB, midKey) &&
+    Object.prototype.hasOwnProperty.call(objB, endKey) &&
+    isDeepEqual(objA[midKey], objB[midKey]) &&
+    isDeepEqual(objA[endKey], objB[endKey])
+  );
 }
 
 // =====================
 // Store
 // =====================
+
+// Add memoization cache
+const selectorCache = new WeakMap<
+  Record<string, unknown>,
+  Map<string, unknown>
+>();
+
+// Add batching mechanism
+let batchUpdates = false;
+const pendingUpdates = new Set<() => void>();
+
+function batch(callback: () => void) {
+  if (batchUpdates) {
+    callback();
+    return;
+  }
+
+  batchUpdates = true;
+  try {
+    callback();
+    if (pendingUpdates.size > 0) {
+      const updates = Array.from(pendingUpdates);
+      pendingUpdates.clear();
+      updates.forEach((update) => update());
+    }
+  } finally {
+    batchUpdates = false;
+  }
+}
 
 export function createStore<
   TStates,
@@ -170,11 +241,25 @@ export function createStore<
   }
 
   function notify() {
+    if (batchUpdates) {
+      const subs = Array.from(subscribers.values());
+      for (const sub of subs) {
+        pendingUpdates.add(() => {
+          const currentState = getState();
+          const newValue = sub.selector(currentState);
+          if (!isDeepEqual(newValue, sub.lastValue)) {
+            sub.lastValue = newValue;
+            sub.callback();
+          }
+        });
+      }
+      return;
+    }
+
     const subs = Array.from(subscribers.values());
     for (const sub of subs) {
       const currentState = getState();
       const newValue = sub.selector(currentState);
-
       if (!isDeepEqual(newValue, sub.lastValue)) {
         sub.lastValue = newValue;
         sub.callback();
@@ -236,7 +321,26 @@ export function createStore<
         if (!selector) return acc;
 
         acc[key] = (payload?: AnyType) => {
-          return selector(getStateFn(), payload);
+          const state = getStateFn() as Record<string, unknown>;
+          const cacheKey = JSON.stringify(payload);
+
+          // Get or create cache for this state object
+          let stateCache = selectorCache.get(state);
+          if (!stateCache) {
+            stateCache = new Map();
+            selectorCache.set(state, stateCache);
+          }
+
+          // Check cache
+          const cachedResult = stateCache.get(`${key}:${cacheKey}`);
+          if (cachedResult !== undefined) {
+            return cachedResult;
+          }
+
+          // Calculate and cache result
+          const result = selector(state as TStates, payload);
+          stateCache.set(`${key}:${cacheKey}`, result);
+          return result;
         };
         return acc;
       },
@@ -313,7 +417,9 @@ export function createStore<
     }
 
     if (shouldNotify) {
-      notify();
+      batch(() => {
+        notify();
+      });
     }
 
     return finalResult as ReturnType<TActions[K]>;
@@ -350,17 +456,17 @@ export function createStore<
 
 export function createScopedStore<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, AnyType>>,
+  TActions extends Record<string, StoreActionFunction<TStates, unknown>>,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
-  >
+  > = Record<string, never>
 >(props: CreateStoreProps<TStates, TActions, TSelectors>) {
   type StoreType = InferStore<TStates, TActions, TSelectors>;
 
   const StoreContext = createContext<StoreType | null>(null);
 
-  const Provider: FC<{ children: ReactNode }> = ({ children }) => {
+  const Provider = ({ children }: { children: ReactNode }) => {
     const store = useMemo(
       () => createStore<TStates, TActions, TSelectors>(props),
       [props]
@@ -371,7 +477,9 @@ export function createScopedStore<
       };
     }, [store]);
 
-    return createElement(StoreContext.Provider, { value: store }, children);
+    return (
+      <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
+    );
   };
   function useStore(): StoreType {
     const context = useContext(StoreContext);

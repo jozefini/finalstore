@@ -1,8 +1,9 @@
 'use client';
 
-import { store } from '../../lib/store';
+import { scoped } from '../../lib/store';
 
 const ThemeToggleButton = () => {
+  const store = scoped.useStore();
   return (
     <button
       onClick={() => store.dispatch.toggleTheme()}
@@ -14,6 +15,7 @@ const ThemeToggleButton = () => {
 };
 
 const ThemeToggleDisplay = () => {
+  const store = scoped.useStore();
   const theme = store.use((s) => s.theme);
 
   return (
@@ -25,14 +27,16 @@ const ThemeToggleDisplay = () => {
 
 export function ThemeToggle() {
   return (
-    <div className="space-y-2">
-      <p className="text-fd-muted-foreground font-mono text-sm">
-        Theme Control
-      </p>
-      <div className="flex items-center gap-4">
-        <ThemeToggleDisplay />
-        <ThemeToggleButton />
+    <scoped.Provider>
+      <div className="space-y-2">
+        <p className="text-fd-muted-foreground font-mono text-sm">
+          Theme Control
+        </p>
+        <div className="flex items-center gap-4">
+          <ThemeToggleDisplay />
+          <ThemeToggleButton />
+        </div>
       </div>
-    </div>
+    </scoped.Provider>
   );
 }

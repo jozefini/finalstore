@@ -1,7 +1,8 @@
 'use client';
 
 import {
-  createCollection,
+  createMap,
+  createScopedStore,
   createStore
 } from '../../../../../packages/store/src/index';
 
@@ -35,7 +36,37 @@ export const store = createStore({
   selectors: {}
 });
 
-export const collection = createCollection({
+export const scoped = createScopedStore({
+  states: {
+    taskId: 1,
+    theme: 'light',
+    count: 0,
+    text: 'Hello'
+  },
+  actions: {
+    incrementTaskId: (state) => {
+      state.taskId++;
+    },
+    resetTaskId: (state) => {
+      state.taskId = 1;
+    },
+    toggleTheme: (state) => {
+      state.theme = state.theme === 'light' ? 'dark' : 'light';
+    },
+    increment: (state) => {
+      state.count++;
+    },
+    decrement: (state) => {
+      state.count--;
+    },
+    setText: (state, text: string) => {
+      state.text = text;
+    }
+  },
+  selectors: {}
+});
+
+export const collection = createMap({
   states: {
     text: '',
     completed: false
