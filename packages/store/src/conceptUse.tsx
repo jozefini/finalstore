@@ -2,34 +2,14 @@
 
 import { createStore } from './storeConcept';
 
-// Define action types explicitly
-type Actions = {
-  incrementTaskId: () => void;
-  resetTaskId: () => void;
-  toggleTheme: () => void;
-  increment: () => void;
-  decrement: () => void;
-  setText: (text: string) => void;
-};
-
-// Define selector types explicitly
-type Selectors = {
-  getText: () => string;
-  isTheme: (payload: 'light' | 'dark') => boolean;
-};
-
-export const concept = createStore<
-  { taskId: number; theme: string; count: number; text: string },
-  Actions,
-  Selectors
->({
+export const concept = createStore({
   states: {
     taskId: 1,
     theme: 'light',
     count: 0,
     text: 'Hello'
   },
-  actions: ({ states, actions }) => ({
+  actions: ({ states, actions, selectors }) => ({
     incrementTaskId: () => {
       states.taskId++;
     },
@@ -49,7 +29,7 @@ export const concept = createStore<
       states.text = text;
     }
   }),
-  selectors: ({ states }) => ({
+  selectors: ({ states, actions, selectors }) => ({
     getText: () => {
       return states.text;
     },

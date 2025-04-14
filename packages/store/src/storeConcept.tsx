@@ -53,12 +53,13 @@ export type Subscriber<T> = {
 // Store Types
 // =====================
 
-// Modify the action function type to correctly handle both cases
+// Define more flexible function types that preserve parameter types
+export type AnyFunction = (...args: any[]) => unknown;
+
 export type StoreActionFunction<TState, TPayload = void> = TPayload extends void
   ? () => unknown | Promise<unknown>
   : (payload: TPayload) => unknown | Promise<unknown>;
 
-// Modify the selector function type to handle both cases
 export type StoreSelectorFunction<
   TState,
   TResult,
@@ -113,25 +114,14 @@ export type InferActionReturnType<T> = T extends (
     : R
   : never;
 
-export type InferStore<
-  TStates,
-  TActions extends Record<string, (...args: unknown[]) => unknown>,
-  TSelectors extends Record<string, (...args: unknown[]) => unknown>
-> = {
-  dispatch: {
-    [K in keyof TActions]: TActions[K] extends () => unknown
-      ? () => ReturnType<TActions[K]>
-      : TActions[K] extends (payload: infer P) => unknown
-        ? (payload: P) => ReturnType<TActions[K]>
-        : never;
-  };
-  silentDispatch: {
-    [K in keyof TActions]: TActions[K] extends () => unknown
-      ? () => ReturnType<TActions[K]>
-      : TActions[K] extends (payload: infer P) => unknown
-        ? (payload: P) => ReturnType<TActions[K]>
-        : never;
-  };
+// Fix for detecting action parameters correctly
+export type InferActionType<T> = T extends () => unknown
+  ? () => ReturnType<T>
+  : T;
+
+export type InferStore<TStates, TActions, TSelectors> = {
+  dispatch: TActions;
+  silentDispatch: TActions;
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
@@ -140,20 +130,8 @@ export type InferStore<
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
   };
-  getSelector: {
-    [K in keyof TSelectors]: TSelectors[K] extends () => unknown
-      ? () => ReturnType<TSelectors[K]>
-      : TSelectors[K] extends (payload: infer P) => unknown
-        ? (payload: P) => ReturnType<TSelectors[K]>
-        : never;
-  };
-  useSelector: {
-    [K in keyof TSelectors]: TSelectors[K] extends () => unknown
-      ? () => ReturnType<TSelectors[K]>
-      : TSelectors[K] extends (payload: infer P) => unknown
-        ? (payload: P) => ReturnType<TSelectors[K]>
-        : never;
-  };
+  getSelector: TSelectors;
+  useSelector: TSelectors;
   reset: () => void;
 };
 
@@ -212,14 +190,14 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
 
 export function createStore<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, AnyType>>,
-  TSelectors extends Record<
-    string,
-    StoreSelectorFunction<TStates, AnyType, AnyType>
-  >
->(
-  props: CreateStoreProps<TStates, TActions, TSelectors>
-): InferStore<TStates, TActions, TSelectors> {
+  TActions extends Record<string, AnyFunction>,
+  TSelectors extends Record<string, AnyFunction>
+>(props: {
+  states: TStates;
+  actions: (context: { states: TStates }) => TActions;
+  selectors: (context: { states: TStates }) => TSelectors;
+  config?: StoreConfig;
+}): InferStore<TStates, TActions, TSelectors> {
   const initialStates = { ...props.states };
   let states = { ...initialStates };
 
@@ -403,10 +381,10 @@ export function createStore<
     Object.keys(actions).reduce((acc, actionKey) => {
       const action = actions[actionKey as keyof TActions];
 
-      // Check if action takes no parameters
-      const actionParamCount = action.length;
+      // Determine if this is a no-arg function by checking its toString
+      const isNoArgFunction = /\(\s*\)/.test(action.toString());
 
-      if (actionParamCount === 0) {
+      if (isNoArgFunction) {
         // No parameters needed for this action
         acc[actionKey] = () => {
           const result = (action as () => unknown | Promise<unknown>)();
@@ -532,9 +510,10 @@ export function createStore<
   ) {
     return Object.keys(selectors).reduce((acc, key) => {
       const selector = selectors[key as keyof TSelectors];
-      const selectorParamCount = selector.length;
+      // Determine if this is a no-arg function by checking its toString
+      const isNoArgFunction = /\(\s*\)/.test(selector.toString());
 
-      if (selectorParamCount === 0) {
+      if (isNoArgFunction) {
         // Selector takes no parameters
         acc[key] = () => {
           if (useHook) {
@@ -581,12 +560,14 @@ export function createStore<
 
 export function createScopedStore<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, AnyType>>,
-  TSelectors extends Record<
-    string,
-    StoreSelectorFunction<TStates, AnyType, AnyType>
-  >
->(props: CreateStoreProps<TStates, TActions, TSelectors>) {
+  TActions extends Record<string, AnyFunction>,
+  TSelectors extends Record<string, AnyFunction>
+>(props: {
+  states: TStates;
+  actions: (context: { states: TStates }) => TActions;
+  selectors: (context: { states: TStates }) => TSelectors;
+  config?: StoreConfig;
+}) {
   type StoreType = InferStore<TStates, TActions, TSelectors>;
 
   const StoreContext = createContext<StoreType | null>(null);
