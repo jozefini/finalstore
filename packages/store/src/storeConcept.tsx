@@ -53,15 +53,17 @@ export type Subscriber<T> = {
 // Store Types
 // =====================
 
-// Modify the action function type to handle payload types
-export type StoreActionFunction<TState, TPayload = void> = (
-  payload: TPayload
-) => unknown | Promise<unknown>;
+// Modify the action function type to correctly handle both cases
+export type StoreActionFunction<TState, TPayload = void> = TPayload extends void
+  ? () => unknown | Promise<unknown>
+  : (payload: TPayload) => unknown | Promise<unknown>;
 
-// Modify the selector function type to handle payload types
-export type StoreSelectorFunction<TState, TResult, TPayload = void> = (
-  payload: TPayload
-) => TResult;
+// Modify the selector function type to handle both cases
+export type StoreSelectorFunction<
+  TState,
+  TResult,
+  TPayload = void
+> = TPayload extends void ? () => TResult : (payload: TPayload) => TResult;
 
 export type PayloadByAction<TStates, TActions> = {
   [K in keyof TActions]: TActions[K] extends () => unknown
@@ -396,21 +398,63 @@ export function createStore<
     return selector(getState());
   }
 
-  // Update the dispatch object creation to handle both sync and async actions
+  // Update the dispatch object creation to handle both cases
   const createDispatchObject = (shouldNotify: boolean) =>
     Object.keys(actions).reduce((acc, actionKey) => {
-      acc[actionKey] = (payload?: AnyType) => {
-        // Create a new state reference for the action to modify
-        const oldState = { ...states };
+      const action = actions[actionKey as keyof TActions];
 
-        // Execute the action
-        const action = actions[actionKey as keyof TActions];
-        const result = action(payload);
+      // Check if action takes no parameters
+      const actionParamCount = action.length;
 
-        if (result instanceof Promise) {
-          // For async actions, return the Promise chain
-          return result.then((res) => {
-            // Send to DevTools
+      if (actionParamCount === 0) {
+        // No parameters needed for this action
+        acc[actionKey] = () => {
+          const result = (action as () => unknown | Promise<unknown>)();
+
+          if (result instanceof Promise) {
+            // For async actions
+            return result.then((res) => {
+              if (devTools && !pauseDevTools) {
+                devTools.send({ type: String(actionKey) }, states);
+              }
+
+              if (shouldNotify) {
+                notify();
+              }
+
+              return res;
+            });
+          } else {
+            // For sync actions
+            if (devTools && !pauseDevTools) {
+              devTools.send({ type: String(actionKey) }, states);
+            }
+
+            if (shouldNotify) {
+              notify();
+            }
+
+            return result;
+          }
+        };
+      } else {
+        // Action requires a payload
+        acc[actionKey] = (payload: AnyType) => {
+          const result = action(payload);
+
+          if (result instanceof Promise) {
+            return result.then((res) => {
+              if (devTools && !pauseDevTools) {
+                devTools.send({ type: String(actionKey), payload }, states);
+              }
+
+              if (shouldNotify) {
+                notify();
+              }
+
+              return res;
+            });
+          } else {
             if (devTools && !pauseDevTools) {
               devTools.send({ type: String(actionKey), payload }, states);
             }
@@ -419,22 +463,11 @@ export function createStore<
               notify();
             }
 
-            return res;
-          });
-        } else {
-          // For sync actions, execute immediately and return the result
-          // Send to DevTools
-          if (devTools && !pauseDevTools) {
-            devTools.send({ type: String(actionKey), payload }, states);
+            return result;
           }
+        };
+      }
 
-          if (shouldNotify) {
-            notify();
-          }
-
-          return result;
-        }
-      };
       return acc;
     }, {} as AnyType);
 
@@ -451,12 +484,23 @@ export function createStore<
     if (typeof action !== 'function')
       throw new Error(`Action ${String(type)} not found`);
 
-    const result = action(payload);
+    // Check if action takes parameters
+    const actionParamCount = action.length;
+    const result =
+      actionParamCount === 0
+        ? (action as () => unknown | Promise<unknown>)()
+        : action(payload);
+
     const finalResult = await result;
 
     // Send to DevTools
     if (devTools && !pauseDevTools) {
-      devTools.send({ type: String(type), payload }, states);
+      devTools.send(
+        actionParamCount === 0
+          ? { type: String(type) }
+          : { type: String(type), payload },
+        states
+      );
     }
 
     if (shouldNotify) {
@@ -487,13 +531,29 @@ export function createStore<
     useHook?: typeof use
   ) {
     return Object.keys(selectors).reduce((acc, key) => {
-      acc[key] = (payload?: AnyType) => {
-        if (useHook) {
-          // Using selector as a render-tracking function but passing payload to the actual selector
-          return useHook(() => selectors[key as keyof TSelectors](payload));
-        }
-        return selectors[key as keyof TSelectors](payload);
-      };
+      const selector = selectors[key as keyof TSelectors];
+      const selectorParamCount = selector.length;
+
+      if (selectorParamCount === 0) {
+        // Selector takes no parameters
+        acc[key] = () => {
+          if (useHook) {
+            // Using selector as a render-tracking function
+            return useHook(() => (selector as () => unknown)());
+          }
+          return (selector as () => unknown)();
+        };
+      } else {
+        // Selector requires a payload
+        acc[key] = (payload: AnyType) => {
+          if (useHook) {
+            // Using selector as a render-tracking function but passing payload to the actual selector
+            return useHook(() => selector(payload));
+          }
+          return selector(payload);
+        };
+      }
+
       return acc;
     }, {} as AnyType);
   }
