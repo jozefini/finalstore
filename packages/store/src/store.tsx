@@ -13,17 +13,145 @@ import {
   type ReactNode
 } from 'react';
 
-import type {
-  AnyType,
-  CreateStoreProps,
-  DevTools,
-  InferStore,
-  PayloadByAction,
-  StoreActionFunction,
-  StoreSelectorFunction
-} from './types';
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyType = any;
 
-/* eslint-disable react-hooks/rules-of-hooks */
+// =====================
+// DevTools Types
+// =====================
+export type DevToolsMessage = {
+  type: string;
+  payload: {
+    type: string;
+  };
+  state?: string;
+};
+
+export type DevTools = {
+  connect: (config: unknown) => DevTools;
+  init: (state: unknown) => void;
+  subscribe: (listener: (message: DevToolsMessage) => void) => void;
+  send: (action: unknown, state: unknown) => void;
+};
+
+// =====================
+// Common Config Types
+// =====================
+export type StoreConfig = {
+  name?: string;
+  devtools?: boolean;
+};
+
+export type Subscriber<T> = {
+  selector: (state: T) => unknown;
+  callback: () => void;
+  lastValue: unknown;
+};
+
+// =====================
+// Store Types
+// =====================
+
+export type StoreActionFunction<TState, TPayload = undefined> = (
+  state: TState,
+  payload: TPayload
+) => unknown | Promise<unknown>;
+
+export type StoreSelectorFunction<TState, TResult, TPayload = undefined> = (
+  state: TState,
+  payload: TPayload
+) => TResult;
+export type PayloadByAction<TStates, TActions> = {
+  [K in keyof TActions]: TActions[K] extends StoreActionFunction<
+    TStates,
+    infer P
+  >
+    ? P
+    : never;
+};
+export type CreateStoreProps<
+  TStates,
+  TActions extends Record<
+    string,
+    StoreActionFunction<TStates, AnyType>
+  > = Record<string, never>,
+  TSelectors extends Record<
+    string,
+    StoreSelectorFunction<TStates, AnyType, AnyType>
+  > = Record<string, never>
+> = {
+  states: TStates;
+  actions: TActions;
+  selectors: TSelectors;
+  config?: StoreConfig;
+};
+
+// Add a type helper to infer if an action is async
+export type InferActionReturnType<T> = T extends (
+  state: AnyType,
+  payload: AnyType
+) => infer R
+  ? R extends Promise<AnyType>
+    ? R
+    : R
+  : never;
+
+export type InferStore<
+  TStates,
+  TActions extends Record<
+    string,
+    StoreActionFunction<TStates, AnyType>
+  > = Record<string, never>,
+  TSelectors extends Record<
+    string,
+    StoreSelectorFunction<TStates, AnyType, AnyType>
+  > = Record<string, never>
+> = {
+  dispatch: {
+    [K in keyof TActions]: (
+      payload?: PayloadByAction<TStates, TActions>[K]
+    ) => ReturnType<TActions[K]>;
+  };
+  silentDispatch: {
+    [K in keyof TActions]: (
+      payload?: PayloadByAction<TStates, TActions>[K]
+    ) => ReturnType<TActions[K]>;
+  };
+  use: {
+    (): TStates;
+    <T>(selector: (state: TStates) => T): T;
+  };
+  get: {
+    (): TStates;
+    <T>(selector: (state: TStates) => T): T;
+  };
+  getSelector: {
+    [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
+      TStates,
+      infer R,
+      infer P
+    >
+      ? undefined extends P
+        ? () => R
+        : (payload: P) => R
+      : never;
+  };
+  useSelector: {
+    [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
+      TStates,
+      infer R,
+      infer P
+    >
+      ? undefined extends P
+        ? () => R
+        : (payload: P) => R
+      : never;
+  };
+  reset: () => void;
+};
+
+// /* eslint-disable react-hooks/rules-of-hooks */
 
 // =====================
 // Utils
