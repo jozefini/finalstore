@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 export type AnyType = any;
 
@@ -67,8 +66,8 @@ export type CreateStoreProps<
   > = Record<string, never>
 > = {
   states: TStates;
-  actions?: TActions;
-  selectors?: TSelectors;
+  actions: TActions;
+  selectors: TSelectors;
   config?: StoreConfig;
 };
 
@@ -82,21 +81,6 @@ export type InferActionReturnType<T> = T extends (
     : R
   : never;
 
-export type SelectorMethods<TStates, TSelectors> =
-  TSelectors extends Record<string, never>
-    ? Record<string, never>
-    : {
-        [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
-          TStates,
-          infer R,
-          infer P
-        >
-          ? undefined extends P
-            ? () => R
-            : (payload: P) => R
-          : never;
-      };
-
 export type InferStore<
   TStates,
   TActions extends Record<
@@ -108,28 +92,46 @@ export type InferStore<
     StoreSelectorFunction<TStates, AnyType, AnyType>
   > = Record<string, never>
 > = {
-  dispatch: TActions extends Record<string, never>
-    ? Record<string, never>
-    : {
-        [K in keyof TActions]: (
-          payload?: PayloadByAction<TStates, TActions>[K]
-        ) => ReturnType<TActions[K]>;
-      };
-  silentDispatch: TActions extends Record<string, never>
-    ? Record<string, never>
-    : {
-        [K in keyof TActions]: (
-          payload?: PayloadByAction<TStates, TActions>[K]
-        ) => ReturnType<TActions[K]>;
-      };
+  dispatch: {
+    [K in keyof TActions]: (
+      payload?: PayloadByAction<TStates, TActions>[K]
+    ) => ReturnType<TActions[K]>;
+  };
+  silentDispatch: {
+    [K in keyof TActions]: (
+      payload?: PayloadByAction<TStates, TActions>[K]
+    ) => ReturnType<TActions[K]>;
+  };
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
-  } & SelectorMethods<TStates, TSelectors>;
+  };
   get: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
-  } & SelectorMethods<TStates, TSelectors>;
+  };
+  getSelector: {
+    [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
+      TStates,
+      infer R,
+      infer P
+    >
+      ? undefined extends P
+        ? () => R
+        : (payload: P) => R
+      : never;
+  };
+  useSelector: {
+    [K in keyof TSelectors]: TSelectors[K] extends StoreSelectorFunction<
+      TStates,
+      infer R,
+      infer P
+    >
+      ? undefined extends P
+        ? () => R
+        : (payload: P) => R
+      : never;
+  };
   reset: () => void;
 };
 
@@ -147,18 +149,12 @@ export type MapSelectorFunction<TState, TPayload = undefined> = (
 ) => AnyType;
 export type CreateMapProps<
   TStates,
-  TActions extends Record<string, MapActionFunction<TStates, AnyType>> = Record<
-    string,
-    never
-  >,
-  TSelectors extends Record<
-    string,
-    MapSelectorFunction<TStates, AnyType>
-  > = Record<string, never>
+  TActions extends Record<string, MapActionFunction<TStates, AnyType>>,
+  TSelectors extends Record<string, MapSelectorFunction<TStates, AnyType>>
 > = {
   states: TStates;
-  actions?: TActions;
-  selectors?: TSelectors;
+  actions: TActions;
+  selectors: TSelectors;
   initialMap?: Map<string, TStates>;
   config?: StoreConfig;
 };

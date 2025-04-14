@@ -1,11 +1,15 @@
+'use client';
+
 import {
   createContext,
+  createElement,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useSyncExternalStore,
+  type FC,
   type ReactNode
 } from 'react';
 
@@ -18,6 +22,8 @@ import type {
   StoreActionFunction,
   StoreSelectorFunction
 } from './types';
+
+/* eslint-disable react-hooks/rules-of-hooks */
 
 // =====================
 // Utils
@@ -38,24 +44,10 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a)) {
     if (!Array.isArray(b) || a.length !== b.length) return false;
 
-    // Early return for empty arrays
-    if (a.length === 0) return true;
-
-    // Check first element for quick mismatch
-    if (!isDeepEqual(a[0], b[0])) return false;
-
-    // If arrays are small, check all elements
-    if (a.length <= 3) {
-      for (let i = 1; i < a.length; i++) {
-        if (!isDeepEqual(a[i], b[i])) return false;
-      }
-      return true;
+    for (let i = 0; i < a.length; i++) {
+      if (!isDeepEqual(a[i], b[i])) return false;
     }
-
-    // For larger arrays, check middle and end elements
-    const mid = Math.floor(a.length / 2);
-    const end = a.length - 1;
-    return isDeepEqual(a[mid], b[mid]) && isDeepEqual(a[end], b[end]);
+    return true;
   }
 
   // Handle regular objects
@@ -65,83 +57,24 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
   const objA = a as Record<string, unknown>;
   const objB = b as Record<string, unknown>;
 
-  const keysA = Object.keys(objA);
-  const keysB = Object.keys(objB);
+  const keys = Object.keys(objA);
+  if (keys.length !== Object.keys(objB).length) return false;
 
-  if (keysA.length !== keysB.length) return false;
-
-  // Early return for empty objects
-  if (keysA.length === 0) return true;
-
-  // Check first key for quick mismatch
-  const firstKey = keysA[0];
-  if (
-    !Object.prototype.hasOwnProperty.call(objB, firstKey) ||
-    !isDeepEqual(objA[firstKey], objB[firstKey])
-  ) {
-    return false;
-  }
-
-  // If object is small, check all keys
-  if (keysA.length <= 3) {
-    for (let i = 1; i < keysA.length; i++) {
-      const key = keysA[i];
-      if (
-        !Object.prototype.hasOwnProperty.call(objB, key) ||
-        !isDeepEqual(objA[key], objB[key])
-      ) {
-        return false;
-      }
+  for (const key of keys) {
+    if (
+      !Object.prototype.hasOwnProperty.call(objB, key) ||
+      !isDeepEqual(objA[key], objB[key])
+    ) {
+      return false;
     }
-    return true;
   }
 
-  // For larger objects, check middle and end keys
-  const mid = Math.floor(keysA.length / 2);
-  const end = keysA.length - 1;
-  const midKey = keysA[mid];
-  const endKey = keysA[end];
-
-  return (
-    Object.prototype.hasOwnProperty.call(objB, midKey) &&
-    Object.prototype.hasOwnProperty.call(objB, endKey) &&
-    isDeepEqual(objA[midKey], objB[midKey]) &&
-    isDeepEqual(objA[endKey], objB[endKey])
-  );
+  return true;
 }
 
 // =====================
 // Store
 // =====================
-
-// Add memoization cache
-const selectorCache = new WeakMap<
-  Record<string, unknown>,
-  Map<string, unknown>
->();
-
-// Add batching mechanism
-let batchUpdates = false;
-const pendingUpdates = new Set<() => void>();
-
-function batch(callback: () => void) {
-  if (batchUpdates) {
-    callback();
-    return;
-  }
-
-  batchUpdates = true;
-  try {
-    callback();
-    if (pendingUpdates.size > 0) {
-      const updates = Array.from(pendingUpdates);
-      pendingUpdates.clear();
-      updates.forEach((update) => update());
-    }
-  } finally {
-    batchUpdates = false;
-  }
-}
 
 export function createStore<
   TStates,
@@ -195,6 +128,7 @@ export function createStore<
                 notify();
                 pauseDevTools = false;
               } catch (error) {
+                // eslint-disable-next-line no-console
                 console.error('Failed to parse jump state:', error);
               }
               break;
@@ -241,25 +175,11 @@ export function createStore<
   }
 
   function notify() {
-    if (batchUpdates) {
-      const subs = Array.from(subscribers.values());
-      for (const sub of subs) {
-        pendingUpdates.add(() => {
-          const currentState = getState();
-          const newValue = sub.selector(currentState);
-          if (!isDeepEqual(newValue, sub.lastValue)) {
-            sub.lastValue = newValue;
-            sub.callback();
-          }
-        });
-      }
-      return;
-    }
-
     const subs = Array.from(subscribers.values());
     for (const sub of subs) {
       const currentState = getState();
       const newValue = sub.selector(currentState);
+
       if (!isDeepEqual(newValue, sub.lastValue)) {
         sub.lastValue = newValue;
         sub.callback();
@@ -267,11 +187,13 @@ export function createStore<
     }
   }
 
-  // Create the base use and get functions
-  const baseUse = (selector?: (state: TStates) => unknown) => {
+  function use(): TStates;
+  function use<T>(selector: (state: TStates) => T): T;
+  function use<T extends unknown[]>(selector: (state: TStates) => T): T;
+  function use<T>(selector?: (state: TStates) => T): TStates | T {
     const stateRef = useRef(getState());
     const selectorRef = useRef(selector);
-    const valueRef = useRef<unknown>(
+    const valueRef = useRef<T | TStates>(
       selector ? selector(getState()) : getState()
     );
 
@@ -303,91 +225,44 @@ export function createStore<
     }, [selector]);
 
     return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot);
-  };
+  }
 
-  const baseGet = (selector?: (state: TStates) => unknown) => {
+  function get(): TStates;
+  function get<T>(selector: (state: TStates) => T): T;
+  function get<T>(selector?: (state: TStates) => T): TStates | T {
     if (!selector) return getState();
     return selector(getState());
-  };
-
-  // Create selector methods for use and get
-  const createSelectorMethods = (getStateFn: () => TStates) => {
-    if (!props.selectors)
-      return {} as Record<string, (payload?: AnyType) => AnyType>;
-
-    return Object.keys(props.selectors).reduce(
-      (acc, key) => {
-        const selector = props.selectors?.[key];
-        if (!selector) return acc;
-
-        acc[key] = (payload?: AnyType) => {
-          const state = getStateFn() as Record<string, unknown>;
-          const cacheKey = JSON.stringify(payload);
-
-          // Get or create cache for this state object
-          let stateCache = selectorCache.get(state);
-          if (!stateCache) {
-            stateCache = new Map();
-            selectorCache.set(state, stateCache);
-          }
-
-          // Check cache
-          const cachedResult = stateCache.get(`${key}:${cacheKey}`);
-          if (cachedResult !== undefined) {
-            return cachedResult;
-          }
-
-          // Calculate and cache result
-          const result = selector(state as TStates, payload);
-          stateCache.set(`${key}:${cacheKey}`, result);
-          return result;
-        };
-        return acc;
-      },
-      {} as Record<string, (payload?: AnyType) => AnyType>
-    );
-  };
-
-  // Create the use and get objects with both function and selector method support
-  const useWithSelectors = Object.assign(
-    baseUse,
-    createSelectorMethods(getState)
-  );
-  const getWithSelectors = Object.assign(
-    baseGet,
-    createSelectorMethods(getState)
-  );
+  }
 
   // Update the dispatch object creation to handle both sync and async actions
   const createDispatchObject = (shouldNotify: boolean) =>
-    actions
-      ? Object.keys(actions).reduce((acc, actionKey) => {
-          acc[actionKey] = (payload?: AnyType) => {
-            const cb = actions[actionKey];
-            const newState = { ...states };
-            const result = cb(newState, payload);
+    Object.keys(actions).reduce((acc, actionKey) => {
+      acc[actionKey] = (payload?: AnyType) => {
+        const cb = actions[actionKey];
+        const newState = { ...states };
+        const result = cb(newState, payload);
 
-            if (result instanceof Promise) {
-              // For async actions, return the Promise chain
-              return dispatch(actionKey, payload, shouldNotify);
-            }
-            // For sync actions, execute immediately and return the result
-            states = newState;
+        if (result instanceof Promise) {
+          // For async actions, return the Promise chain
+          return dispatch(actionKey, payload, shouldNotify);
+        } else {
+          // For sync actions, execute immediately and return the result
+          states = newState;
 
-            // Send to DevTools
-            if (devTools && !pauseDevTools) {
-              devTools.send({ type: String(actionKey), payload }, states);
-            }
+          // Send to DevTools
+          if (devTools && !pauseDevTools) {
+            devTools.send({ type: String(actionKey), payload }, states);
+          }
 
-            if (shouldNotify) {
-              notify();
-            }
+          if (shouldNotify) {
+            notify();
+          }
 
-            return result;
-          };
-          return acc;
-        }, {} as AnyType)
-      : {};
+          return result;
+        }
+      };
+      return acc;
+    }, {} as AnyType);
 
   const dispatchObject = createDispatchObject(true);
   const silentDispatchObject = createDispatchObject(false);
@@ -398,7 +273,6 @@ export function createStore<
     payload?: PayloadByAction<TStates, TActions>[K],
     shouldNotify = true
   ): Promise<ReturnType<TActions[K]>> {
-    if (!actions) throw new Error('Actions are not defined');
     const cb = actions[type];
     if (typeof cb !== 'function')
       throw new Error(`Action ${String(type)} not found`);
@@ -417,9 +291,7 @@ export function createStore<
     }
 
     if (shouldNotify) {
-      batch(() => {
-        notify();
-      });
+      notify();
     }
 
     return finalResult as ReturnType<TActions[K]>;
@@ -439,11 +311,39 @@ export function createStore<
     }
   }
 
+  // Create selector methods
+  function createSelectorMethods(
+    selectors: TSelectors,
+    getState: () => TStates,
+    useHook?: typeof use
+  ) {
+    return Object.keys(selectors).reduce((acc, key) => {
+      acc[key] = (payload?: AnyType) => {
+        if (useHook) {
+          return useHook((state: TStates) => selectors[key](state, payload));
+        }
+        return selectors[key](getState(), payload);
+      };
+      return acc;
+    }, {} as AnyType);
+  }
+
+  // In createStore, before returning:
+  const getterMethods = props.selectors
+    ? createSelectorMethods(props.selectors, getState)
+    : {};
+
+  const useMethods = props.selectors
+    ? createSelectorMethods(props.selectors, getState, use)
+    : {};
+
   const baseStore = {
     dispatch: dispatchObject,
     silentDispatch: silentDispatchObject,
-    use: useWithSelectors,
-    get: getWithSelectors,
+    use,
+    get,
+    getSelector: getterMethods,
+    useSelector: useMethods,
     reset
   } as const;
 
@@ -456,20 +356,20 @@ export function createStore<
 
 export function createScopedStore<
   TStates,
-  TActions extends Record<string, StoreActionFunction<TStates, unknown>>,
+  TActions extends Record<string, StoreActionFunction<TStates, AnyType>>,
   TSelectors extends Record<
     string,
     StoreSelectorFunction<TStates, AnyType, AnyType>
-  > = Record<string, never>
+  >
 >(props: CreateStoreProps<TStates, TActions, TSelectors>) {
   type StoreType = InferStore<TStates, TActions, TSelectors>;
 
   const StoreContext = createContext<StoreType | null>(null);
 
-  const Provider = ({ children }: { children: ReactNode }) => {
+  const Provider: FC<{ children: ReactNode }> = ({ children }) => {
     const store = useMemo(
       () => createStore<TStates, TActions, TSelectors>(props),
-      [props]
+      []
     );
     useEffect(() => {
       return () => {
@@ -477,9 +377,7 @@ export function createScopedStore<
       };
     }, [store]);
 
-    return (
-      <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
-    );
+    return createElement(StoreContext.Provider, { value: store }, children);
   };
   function useStore(): StoreType {
     const context = useContext(StoreContext);

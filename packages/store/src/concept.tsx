@@ -114,7 +114,7 @@ const TodoList = () => {
 
 export function Concept() {
   const store = concept.useStore();
-  const isDarkTheme = store.use.isTheme('light');
+  const isDarkTheme = store.useSelector.isTheme('light');
   const theme = store.use((s) => s.theme);
   console.log('isDarkTheme', isDarkTheme);
 
