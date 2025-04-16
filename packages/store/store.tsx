@@ -1,19 +1,37 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyType = any;
+type ActionsContext<TState, TActions, TSelectors> = (store: {
+  states: TState;
+  actions: TActions;
+  selectors: TSelectors;
+}) => TActions;
+type SelectorsContext<TState, TSelectors> = (store: {
+  states: TState;
+  selectors: TSelectors;
+}) => TSelectors;
+type StoreProps<TState, TActions, TSelectors> = {
+  states: TState;
+  actions: ActionsContext<TState, TActions, TSelectors>;
+  selectors: SelectorsContext<TState, TSelectors>;
+};
+type SelectorFn<State> = <R>(selector: (state: State) => R) => R;
+type UseOrGet<TState, TSelectors> = SelectorFn<TState> & TSelectors;
+type InferStore<TState, TActions, TSelectors> = {
+  dispatch: TActions;
+  silentDispatch: TActions;
+  use: UseOrGet<TState, TSelectors>;
+  get: UseOrGet<TState, TSelectors>;
+};
+
+// STORE:
 
 export function createStore<
   TState extends Record<string, unknown> = AnyType,
   TActions extends Record<string, unknown> = AnyType,
   TSelectors extends Record<string, unknown> = AnyType
->(props: {
-  states: TState;
-  actions: (store: {
-    states: TState;
-    actions: TActions;
-    selectors: TSelectors;
-  }) => TActions;
-  selectors: (store: { states: TState; selectors: TSelectors }) => TSelectors;
-}) {
+>(
+  props: StoreProps<TState, TActions, TSelectors>
+): InferStore<TState, TActions, TSelectors> {
   const { states } = props;
   const actionProxy =
     (props?.actions as unknown as TActions) || ({} as TActions);
@@ -29,18 +47,27 @@ export function createStore<
   Object.assign(actionProxy, actions);
   Object.assign(selectorProxy, selectors);
 
+  // Create the getter function that also has selectors as properties
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getterFn: SelectorFn<TState> = (selector) => selector(states);
+  // Assign all selectors as properties of the getter function
+  Object.assign(getterFn, selectors);
+
+  // Create the user function, identical to getter for now
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userFn: SelectorFn<TState> = (selector) => selector(states);
+  // Assign all selectors as properties
+  Object.assign(userFn, selectors);
+
   return {
-    states,
     dispatch: actions,
-    use: selectors
-  } as {
-    states: TState;
-    dispatch: TActions;
-    use: TSelectors;
+    silentDispatch: actions,
+    use: userFn as UseOrGet<TState, TSelectors>,
+    get: getterFn as UseOrGet<TState, TSelectors>
   };
 }
 
-// Concept with typesafety
+// EXAMPLE:
 
 type City = 'New York' | 'Los Angeles' | 'Chicago';
 type StateType = {
@@ -57,14 +84,13 @@ type SelectorType = {
   isAdult(): boolean;
   isFrom(city: City): boolean;
 };
-
 export const store = createStore<StateType, ActionType, SelectorType>({
   states: {
     name: 'John',
     age: 20,
     city: 'New York'
   },
-  actions: ({ states, actions, selectors }) => ({
+  actions: ({ states, actions }) => ({
     setName: (name: string) => {
       states.name = name;
       return states.name;
@@ -91,19 +117,16 @@ export const store = createStore<StateType, ActionType, SelectorType>({
   })
 });
 
-// The dispatch object is created automatically, and is typed
-// based on the actions and selectors, so if you try to do
-// store.dispatch.setName('John') it will be typed as string
 store.dispatch.setName('John');
 store.dispatch.reset();
-
-// The selectors are typed, so if you try to do
-// store.selectors.isFrom('New York') it will be typed as City
-const isFromNY = store.use.isFrom('New York');
-const isAdult = store.use.isAdult();
-
-/* Task Description
-I want to implement this type safety store creation. The biggest sell-point here is the inferred types that this store should do automatically, the user creating the store should not be forced to manually type every state or action or selector.
-
-Try to understand the concept and slowly gain confidence by improving the types and reaching our goals
-*/
+store.silentDispatch.setName('John');
+store.silentDispatch.reset();
+store.use.isFrom('New York');
+store.use.isAdult();
+store.get.isFrom('New York');
+store.get.isAdult();
+store.get.isFrom('New York');
+store.get((s) => s.name); // Function form
+store.get.isAdult(); // Property form
+store.use((s) => s.age); // Function form
+store.use.isFrom('New York'); // Property form
