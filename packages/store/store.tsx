@@ -1,6 +1,15 @@
 'use client';
 
-import { useCallback, useRef, useSyncExternalStore } from 'react';
+import React, {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore
+} from 'react';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyType = any;
@@ -57,7 +66,6 @@ type DevTools = {
 // Update the InferStore type to match our implementation
 type InferStore<TState, TActions, TSelectors> = {
   dispatch: TActions;
-  silentDispatch: TActions;
   use: {
     (): TState;
     <T>(selector: (state: TState) => T): T;
@@ -71,6 +79,44 @@ type InferStore<TState, TActions, TSelectors> = {
     [K in keyof TSelectors]: TSelectors[K];
   };
   reset: () => void;
+  batch: (callback: () => void) => void; // Batching API
+};
+
+// Utility for batching updates
+const createBatcher = () => {
+  let isBatching = false;
+  let notifyQueued = false;
+  let notifyCallback: (() => void) | null = null;
+
+  const batch = (fn: () => void, notify: () => void) => {
+    if (!isBatching) {
+      // If not already batching, start a new batch
+      isBatching = true;
+      notifyCallback = notify;
+      try {
+        fn();
+      } finally {
+        // End the batch and notify if needed
+        isBatching = false;
+        if (notifyCallback) {
+          // Always call notify when batch finishes at top level
+          const cb = notifyCallback;
+          notifyCallback = null;
+          notifyQueued = false;
+          cb();
+        }
+      }
+    } else {
+      // If already batching, just execute the function
+      // and queue notification for the parent batch
+      fn();
+      notifyQueued = true;
+    }
+  };
+
+  const shouldNotify = () => !isBatching;
+
+  return { batch, shouldNotify };
 };
 
 // HELPERS:
@@ -132,6 +178,9 @@ export function createStore<
 ): InferStore<TState, TActions, TSelectors> {
   const initialStates = { ...props.states };
   let states = { ...initialStates };
+
+  // Create a batcher for update batching
+  const { batch, shouldNotify } = createBatcher();
 
   // Create a proxy for states that always points to the current value
   const statesProxy = new Proxy({} as TState, {
@@ -213,19 +262,40 @@ export function createStore<
   Object.assign(actionProxy, actions);
   Object.assign(selectorProxy, selectors);
 
-  // Subscribers for reactivity
-  const subscribers = new Map<
+  // Subscribers for reactivity with memoization
+  const subscriberMap = new Map<
     number,
     {
       selector: (state: TState) => unknown;
       callback: () => void;
       lastValue: unknown;
+      memoizedSelector?: (state: TState) => unknown;
     }
   >();
   let nextSubscriberId = 0;
 
+  const selectorCache = new WeakMap();
+
   function getState() {
     return states;
+  }
+
+  function memoizeSelector<T>(
+    selector: (state: TState) => T
+  ): (state: TState) => T {
+    // Return a memoized version of the selector
+    return (state: TState) => {
+      const cache = selectorCache.get(selector);
+
+      if (!cache || cache.lastState !== state) {
+        // If no cache entry or state reference changed, compute the result
+        const result = selector(state);
+        selectorCache.set(selector, { lastState: state, lastResult: result });
+        return result;
+      }
+
+      return cache.lastResult as T;
+    };
   }
 
   function subscribe(
@@ -234,24 +304,29 @@ export function createStore<
   ) {
     const id = nextSubscriberId++;
     const initialSelector = selector || ((s: TState) => s);
-    const initialValue = initialSelector(getState());
+    // Memoize the selector for better performance
+    const memoizedSelector = memoizeSelector(initialSelector);
+    const initialValue = memoizedSelector(getState());
 
-    subscribers.set(id, {
+    subscriberMap.set(id, {
       selector: initialSelector,
+      memoizedSelector,
       callback,
       lastValue: initialValue
     });
 
     return () => {
-      subscribers.delete(id);
+      subscriberMap.delete(id);
     };
   }
 
   function notify() {
-    const subs = Array.from(subscribers.values());
+    const subs = Array.from(subscriberMap.values());
+    const currentState = getState();
+
     for (const sub of subs) {
-      const currentState = getState();
-      const newValue = sub.selector(currentState);
+      const selector = sub.memoizedSelector || sub.selector;
+      const newValue = selector(currentState);
 
       if (!isDeepEqual(newValue, sub.lastValue)) {
         sub.lastValue = newValue;
@@ -261,7 +336,7 @@ export function createStore<
   }
 
   // Create dispatch functions
-  const createDispatchObject = (shouldNotify: boolean) =>
+  const createDispatchObject = () =>
     Object.keys(actions).reduce((acc, actionKey) => {
       acc[actionKey] = (payload?: AnyType) => {
         const cb = actions[actionKey];
@@ -274,7 +349,7 @@ export function createStore<
 
         if (result instanceof Promise) {
           // For async actions, return the Promise chain
-          return dispatch(actionKey, payload, shouldNotify);
+          return dispatch(actionKey, payload);
         } else {
           // For sync actions, execute immediately and return the result
 
@@ -283,7 +358,7 @@ export function createStore<
             devTools.send({ type: String(actionKey), payload }, states);
           }
 
-          if (shouldNotify) {
+          if (shouldNotify()) {
             notify();
           }
 
@@ -293,14 +368,28 @@ export function createStore<
       return acc;
     }, {} as AnyType);
 
-  const dispatchObject = createDispatchObject(true);
-  const silentDispatchObject = createDispatchObject(false);
+  const dispatchObject = createDispatchObject();
+
+  // Run multiple actions in a batch with a single notification at the end
+  function batchActions(callback: () => void) {
+    const prevState = { ...states };
+    batch(
+      () => {
+        callback();
+        states = { ...states };
+      },
+      () => {
+        if (!isDeepEqual(prevState, states)) {
+          notify();
+        }
+      }
+    );
+  }
 
   // Dedicated async dispatch helper
   async function dispatch<K extends keyof TActions>(
     type: K,
-    payload?: PayloadByAction<TActions>[K],
-    shouldNotify = true
+    payload?: PayloadByAction<TActions>[K]
   ): Promise<ReturnType<TActions[K]>> {
     const cb = actions[type];
     if (typeof cb !== 'function')
@@ -320,9 +409,7 @@ export function createStore<
       devTools.send({ type: String(type), payload }, states);
     }
 
-    if (shouldNotify) {
-      notify();
-    }
+    notify();
 
     return finalResult as ReturnType<TActions[K]>;
   }
@@ -342,31 +429,42 @@ export function createStore<
     }
   }
 
-  // Get with function overloading
+  // Get with function overloading and memoization
   function get(): TState;
   function get<T>(selector: (state: TState) => T): T;
   function get<T>(selector?: (state: TState) => T): TState | T {
     if (!selector) return getState();
-    return selector(getState());
+
+    // Use memoized selector for better performance
+    const memoizedSel = memoizeSelector(selector);
+    return memoizedSel(getState());
   }
   Object.assign(get, selectors);
 
-  // Use with React hooks
+  // Use with React hooks and optimized subscriptions
   function use(): TState;
   function use<T>(selector: (state: TState) => T): T;
   function use<T extends unknown[]>(selector: (state: TState) => T): T;
   function use<T>(selector?: (state: TState) => T): TState | T {
     const stateRef = useRef(getState());
     const selectorRef = useRef(selector);
-    const valueRef = useRef<T | TState>(
-      selector ? selector(getState()) : getState()
+
+    // Memoize the selector function to prevent unnecessary recalculations
+    const memoizedSelector = useMemo(
+      () => (selector ? memoizeSelector(selector) : undefined),
+      [selector]
     );
 
+    const valueRef = useRef<T | TState>(
+      memoizedSelector ? memoizedSelector(getState()) : getState()
+    );
+
+    // Update references if selector changes
     if (selector !== selectorRef.current) {
       selectorRef.current = selector;
       stateRef.current = getState();
-      valueRef.current = selector
-        ? selector(stateRef.current)
+      valueRef.current = memoizedSelector
+        ? (memoizedSelector(stateRef.current) as T | TState)
         : stateRef.current;
     }
 
@@ -383,11 +481,13 @@ export function createStore<
 
       if (hasStateChanged || !valueRef.current) {
         stateRef.current = currentState;
-        valueRef.current = selector ? selector(currentState) : currentState;
+        valueRef.current = memoizedSelector
+          ? (memoizedSelector(currentState) as T | TState)
+          : currentState;
       }
 
       return valueRef.current;
-    }, [selector]);
+    }, [memoizedSelector]);
 
     return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot);
   }
@@ -395,11 +495,52 @@ export function createStore<
 
   return {
     dispatch: dispatchObject as unknown as TActions,
-    silentDispatch: silentDispatchObject as unknown as TActions,
     use: use as typeof use & TSelectors,
     get: get as typeof get & TSelectors,
-    reset
+    reset,
+    batch: batchActions
   };
+}
+
+// Export a createScopedStore for component-level state management
+export function createScopedStore<
+  TState extends Record<string, unknown> = AnyType,
+  TActions extends Record<string, StoreActionFunction<AnyType>> = AnyType,
+  TSelectors extends Record<
+    string,
+    StoreSelectorFunction<AnyType, AnyType>
+  > = AnyType
+>(props: StoreProps<TState, TActions, TSelectors>) {
+  type StoreType = InferStore<TState, TActions, TSelectors>;
+  type ReactNode = React.ReactNode;
+
+  const StoreContext = createContext<StoreType | null>(null);
+
+  const Provider = ({ children }: { children: ReactNode }) => {
+    const store = useMemo(
+      () => createStore<TState, TActions, TSelectors>(props),
+      []
+    );
+
+    // Clean up when the component unmounts
+    useEffect(() => {
+      return () => {
+        store.reset();
+      };
+    }, [store]);
+
+    return createElement(StoreContext.Provider, { value: store }, children);
+  };
+
+  function useStore(): StoreType {
+    const context = useContext(StoreContext);
+    if (!context) {
+      throw new Error('useStore must be used within a StoreProvider');
+    }
+    return context;
+  }
+
+  return { Provider, useStore };
 }
 
 // EXAMPLE:
@@ -475,7 +616,7 @@ export const StoreExamples = () => {
           <strong>IsAdult:</strong> {isAdultCb ? 'Yes' : 'No'}
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           className={btnStyle}
           onClick={() =>
@@ -486,17 +627,32 @@ export const StoreExamples = () => {
         </button>
         <button
           className={btnStyle}
-          onClick={() =>
-            store.silentDispatch.setName('John' + Math.random().toFixed(2))
-          }
-        >
-          Silent Change Name
-        </button>
-        <button
-          className={btnStyle}
           onClick={() => store.dispatch.toggleAdult()}
         >
           Toggle Adult
+        </button>
+        <button
+          className={btnStyle}
+          onClick={() => {
+            // Using batch for multiple operations
+            store.batch(() => {
+              store.dispatch.setName('Silent' + Math.random().toFixed(2));
+              // No notification until batch ends
+            });
+          }}
+        >
+          Batched Name
+        </button>
+        <button
+          className={btnStyle}
+          onClick={() =>
+            store.batch(() => {
+              store.dispatch.setName('Batched' + Math.random().toFixed(2));
+              store.dispatch.toggleAdult();
+            })
+          }
+        >
+          Batch Multiple
         </button>
         <button className={btnStyle} onClick={() => store.reset()}>
           Reset
