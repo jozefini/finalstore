@@ -53,8 +53,12 @@ export type Subscriber<T> = {
 // Store Types
 // =====================
 
-// Define more flexible function types that preserve parameter types
-export type AnyFunction = (...args: any[]) => unknown;
+// Define a generic function type that preserves parameter types
+// biome-ignore lint/suspicious/noExplicitAny: Needed for flexible function types
+export type GenericFunction = (...args: AnyType[]) => unknown;
+
+// Define a utility type that preserves function signatures
+export type FunctionWithExactParams<F extends GenericFunction> = F;
 
 export type StoreActionFunction<TState, TPayload = void> = TPayload extends void
   ? () => unknown | Promise<unknown>
@@ -119,9 +123,70 @@ export type InferActionType<T> = T extends () => unknown
   ? () => ReturnType<T>
   : T;
 
-export type InferStore<TStates, TActions, TSelectors> = {
-  dispatch: TActions;
-  silentDispatch: TActions;
+// Define more specific types for function parameter inference
+// biome-ignore lint/suspicious/noExplicitAny: Needed for type inference
+export type InferParamTypes<F> = F extends (params: infer P) => unknown
+  ? P
+  : F extends () => unknown
+    ? void
+    : never;
+
+// biome-ignore lint/suspicious/noExplicitAny: Needed for type inference
+export type InferReturnType<F> = F extends (...args: unknown[]) => infer R
+  ? R
+  : never;
+
+// =====================
+// Type inference helpers
+// =====================
+
+// Helper to extract action payload types
+export type InferActionPayloads<TActions> = {
+  [K in keyof TActions]: TActions[K] extends () => unknown
+    ? void
+    : TActions[K] extends (payload: infer P) => unknown
+      ? P
+      : never;
+};
+
+// Helper to create correctly typed dispatch methods
+export type TypedDispatchMethods<TActions> = {
+  [K in keyof TActions]: TActions[K] extends () => infer R
+    ? () => R
+    : TActions[K] extends (payload: infer P) => infer R
+      ? (payload: P) => R
+      : never;
+};
+
+// Helper to create correctly typed selector methods
+export type TypedSelectorMethods<TSelectors> = {
+  [K in keyof TSelectors]: TSelectors[K] extends () => infer R
+    ? () => R
+    : TSelectors[K] extends (payload: infer P) => infer R
+      ? (payload: P) => R
+      : never;
+};
+
+// Update InferStore to use our new helpers
+export type InferStore<
+  TStates,
+  TActions extends Record<string, GenericFunction>,
+  TSelectors extends Record<string, GenericFunction>
+> = {
+  dispatch: {
+    [K in keyof TActions]: TActions[K] extends () => unknown
+      ? () => ReturnType<TActions[K]>
+      : TActions[K] extends (payload: infer P) => unknown
+        ? (payload: P) => ReturnType<TActions[K]>
+        : never;
+  };
+  silentDispatch: {
+    [K in keyof TActions]: TActions[K] extends () => unknown
+      ? () => ReturnType<TActions[K]>
+      : TActions[K] extends (payload: infer P) => unknown
+        ? (payload: P) => ReturnType<TActions[K]>
+        : never;
+  };
   use: {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
@@ -130,8 +195,20 @@ export type InferStore<TStates, TActions, TSelectors> = {
     (): TStates;
     <T>(selector: (state: TStates) => T): T;
   };
-  getSelector: TSelectors;
-  useSelector: TSelectors;
+  getSelector: {
+    [K in keyof TSelectors]: TSelectors[K] extends () => unknown
+      ? () => ReturnType<TSelectors[K]>
+      : TSelectors[K] extends (payload: infer P) => unknown
+        ? (payload: P) => ReturnType<TSelectors[K]>
+        : never;
+  };
+  useSelector: {
+    [K in keyof TSelectors]: TSelectors[K] extends () => unknown
+      ? () => ReturnType<TSelectors[K]>
+      : TSelectors[K] extends (payload: infer P) => unknown
+        ? (payload: P) => ReturnType<TSelectors[K]>
+        : never;
+  };
   reset: () => void;
 };
 
@@ -190,12 +267,14 @@ export function isDeepEqual(a: unknown, b: unknown): boolean {
 
 export function createStore<
   TStates,
-  TActions extends Record<string, AnyFunction>,
-  TSelectors extends Record<string, AnyFunction>
+  TActions extends Record<string, GenericFunction>,
+  TSelectors extends Record<string, GenericFunction>
 >(props: {
   states: TStates;
-  actions: (context: { states: TStates }) => TActions;
-  selectors: (context: { states: TStates }) => TSelectors;
+  actions: (context: StoreContext<TStates, TActions, TSelectors>) => TActions;
+  selectors: (
+    context: StoreContext<TStates, TActions, TSelectors>
+  ) => TSelectors;
   config?: StoreConfig;
 }): InferStore<TStates, TActions, TSelectors> {
   const initialStates = { ...props.states };
@@ -286,7 +365,7 @@ export function createStore<
   const subscribers = new Map<
     number,
     {
-      selector: (state: TStates) => unknown;
+      selector: (state: typeof states) => unknown;
       callback: () => void;
       lastValue: unknown;
     }
@@ -299,10 +378,10 @@ export function createStore<
 
   function subscribe(
     callback: () => void,
-    selector?: (state: TStates) => unknown
+    selector?: (state: typeof states) => unknown
   ) {
     const id = nextSubscriberId++;
-    const initialSelector = selector || ((s: TStates) => s);
+    const initialSelector = selector || ((s: typeof states) => s);
     const initialValue = initialSelector(getState());
 
     subscribers.set(id, {
@@ -329,13 +408,13 @@ export function createStore<
     }
   }
 
-  function use(): TStates;
-  function use<T>(selector: (state: TStates) => T): T;
-  function use<T extends unknown[]>(selector: (state: TStates) => T): T;
-  function use<T>(selector?: (state: TStates) => T): TStates | T {
+  function use(): typeof states;
+  function use<T>(selector: (state: typeof states) => T): T;
+  function use<T extends unknown[]>(selector: (state: typeof states) => T): T;
+  function use<T>(selector?: (state: typeof states) => T): typeof states | T {
     const stateRef = useRef(getState());
     const selectorRef = useRef(selector);
-    const valueRef = useRef<T | TStates>(
+    const valueRef = useRef<T | typeof states>(
       selector ? selector(getState()) : getState()
     );
 
@@ -369,31 +448,44 @@ export function createStore<
     return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot);
   }
 
-  function get(): TStates;
-  function get<T>(selector: (state: TStates) => T): T;
-  function get<T>(selector?: (state: TStates) => T): TStates | T {
+  function get(): typeof states;
+  function get<T>(selector: (state: typeof states) => T): T;
+  function get<T>(selector?: (state: typeof states) => T): typeof states | T {
     if (!selector) return getState();
     return selector(getState());
   }
 
-  // Update the dispatch object creation to handle both cases
-  const createDispatchObject = (shouldNotify: boolean) =>
-    Object.keys(actions).reduce((acc, actionKey) => {
-      const action = actions[actionKey as keyof TActions];
+  // Helper function to cast functions while preserving types
+  function typedCast<T>(fn: GenericFunction): T {
+    return fn as unknown as T;
+  }
 
-      // Determine if this is a no-arg function by checking its toString
-      const isNoArgFunction = /\(\s*\)/.test(action.toString());
+  // Update the dispatch object creation
+  const createDispatchObject = (shouldNotify: boolean) => {
+    // Create a correctly typed object
+    const dispatchObj = {} as {
+      [K in keyof TActions]: TActions[K] extends () => unknown
+        ? () => ReturnType<TActions[K]>
+        : TActions[K] extends (payload: infer P) => unknown
+          ? (payload: P) => ReturnType<TActions[K]>
+          : never;
+    };
 
-      if (isNoArgFunction) {
-        // No parameters needed for this action
-        acc[actionKey] = () => {
-          const result = (action as () => unknown | Promise<unknown>)();
+    // Add each action to the object with the correct typing
+    Object.keys(actions).forEach((actionKey) => {
+      const key = actionKey as keyof TActions;
+      const action = actions[key];
+
+      // Create a function with the same signature as the original action
+      if (action.length === 0) {
+        // No parameters action
+        (dispatchObj as Record<string, unknown>)[key as string] = function () {
+          const result = action();
 
           if (result instanceof Promise) {
-            // For async actions
             return result.then((res) => {
               if (devTools && !pauseDevTools) {
-                devTools.send({ type: String(actionKey) }, states);
+                devTools.send({ type: String(key) }, states);
               }
 
               if (shouldNotify) {
@@ -403,9 +495,8 @@ export function createStore<
               return res;
             });
           } else {
-            // For sync actions
             if (devTools && !pauseDevTools) {
-              devTools.send({ type: String(actionKey) }, states);
+              devTools.send({ type: String(key) }, states);
             }
 
             if (shouldNotify) {
@@ -416,14 +507,22 @@ export function createStore<
           }
         };
       } else {
-        // Action requires a payload
-        acc[actionKey] = (payload: AnyType) => {
+        // Action with parameters
+        (dispatchObj as Record<string, unknown>)[key as string] = function (
+          payload: unknown
+        ) {
           const result = action(payload);
 
           if (result instanceof Promise) {
             return result.then((res) => {
               if (devTools && !pauseDevTools) {
-                devTools.send({ type: String(actionKey), payload }, states);
+                devTools.send(
+                  {
+                    type: String(key),
+                    payload
+                  },
+                  states
+                );
               }
 
               if (shouldNotify) {
@@ -434,7 +533,13 @@ export function createStore<
             });
           } else {
             if (devTools && !pauseDevTools) {
-              devTools.send({ type: String(actionKey), payload }, states);
+              devTools.send(
+                {
+                  type: String(key),
+                  payload
+                },
+                states
+              );
             }
 
             if (shouldNotify) {
@@ -445,48 +550,10 @@ export function createStore<
           }
         };
       }
+    });
 
-      return acc;
-    }, {} as AnyType);
-
-  const dispatchObject = createDispatchObject(true);
-  const silentDispatchObject = createDispatchObject(false);
-
-  // We still need this for async actions
-  async function dispatch<K extends keyof TActions>(
-    type: K,
-    payload?: PayloadByAction<TStates, TActions>[K],
-    shouldNotify = true
-  ): Promise<ReturnType<TActions[K]>> {
-    const action = actions[type];
-    if (typeof action !== 'function')
-      throw new Error(`Action ${String(type)} not found`);
-
-    // Check if action takes parameters
-    const actionParamCount = action.length;
-    const result =
-      actionParamCount === 0
-        ? (action as () => unknown | Promise<unknown>)()
-        : action(payload);
-
-    const finalResult = await result;
-
-    // Send to DevTools
-    if (devTools && !pauseDevTools) {
-      devTools.send(
-        actionParamCount === 0
-          ? { type: String(type) }
-          : { type: String(type), payload },
-        states
-      );
-    }
-
-    if (shouldNotify) {
-      notify();
-    }
-
-    return finalResult as ReturnType<TActions[K]>;
-  }
+    return dispatchObj;
+  };
 
   function reset() {
     const prevStates = states;
@@ -502,46 +569,57 @@ export function createStore<
     }
   }
 
-  // Create selector methods
+  // Update selector methods creation
   function createSelectorMethods(
     selectors: TSelectors,
     getState: () => TStates,
     useHook?: typeof use
   ) {
-    return Object.keys(selectors).reduce((acc, key) => {
-      const selector = selectors[key as keyof TSelectors];
-      // Determine if this is a no-arg function by checking its toString
-      const isNoArgFunction = /\(\s*\)/.test(selector.toString());
+    // Create a correctly typed object
+    const selectorObj = {} as {
+      [K in keyof TSelectors]: TSelectors[K] extends () => unknown
+        ? () => ReturnType<TSelectors[K]>
+        : TSelectors[K] extends (payload: infer P) => unknown
+          ? (payload: P) => ReturnType<TSelectors[K]>
+          : never;
+    };
 
-      if (isNoArgFunction) {
-        // Selector takes no parameters
-        acc[key] = () => {
+    // Add each selector to the object with the correct typing
+    Object.keys(selectors).forEach((selectorKey) => {
+      const key = selectorKey as keyof TSelectors;
+      const selector = selectors[key];
+
+      // Create a function with the same signature as the original selector
+      if (selector.length === 0) {
+        // No parameters selector
+        (selectorObj as Record<string, unknown>)[key as string] = function () {
           if (useHook) {
-            // Using selector as a render-tracking function
-            return useHook(() => (selector as () => unknown)());
+            return useHook(() => selector());
           }
-          return (selector as () => unknown)();
+          return selector();
         };
       } else {
-        // Selector requires a payload
-        acc[key] = (payload: AnyType) => {
+        // Selector with parameters
+        (selectorObj as Record<string, unknown>)[key as string] = function (
+          payload: unknown
+        ) {
           if (useHook) {
-            // Using selector as a render-tracking function but passing payload to the actual selector
             return useHook(() => selector(payload));
           }
           return selector(payload);
         };
       }
+    });
 
-      return acc;
-    }, {} as AnyType);
+    return selectorObj;
   }
 
-  // In createStore, before returning:
+  const dispatchObject = createDispatchObject(true);
+  const silentDispatchObject = createDispatchObject(false);
   const getterMethods = createSelectorMethods(selectors, getState);
   const useMethods = createSelectorMethods(selectors, getState, use);
 
-  const baseStore = {
+  const store = {
     dispatch: dispatchObject,
     silentDispatch: silentDispatchObject,
     use,
@@ -549,9 +627,9 @@ export function createStore<
     getSelector: getterMethods,
     useSelector: useMethods,
     reset
-  } as const;
+  };
 
-  return baseStore as InferStore<TStates, TActions, TSelectors>;
+  return store as InferStore<typeof states, typeof actions, typeof selectors>;
 }
 
 // =====================
@@ -560,12 +638,14 @@ export function createStore<
 
 export function createScopedStore<
   TStates,
-  TActions extends Record<string, AnyFunction>,
-  TSelectors extends Record<string, AnyFunction>
+  TActions extends Record<string, GenericFunction>,
+  TSelectors extends Record<string, GenericFunction>
 >(props: {
   states: TStates;
-  actions: (context: { states: TStates }) => TActions;
-  selectors: (context: { states: TStates }) => TSelectors;
+  actions: (context: StoreContext<TStates, TActions, TSelectors>) => TActions;
+  selectors: (
+    context: StoreContext<TStates, TActions, TSelectors>
+  ) => TSelectors;
   config?: StoreConfig;
 }) {
   type StoreType = InferStore<TStates, TActions, TSelectors>;

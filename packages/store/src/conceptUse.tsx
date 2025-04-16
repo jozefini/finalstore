@@ -9,7 +9,7 @@ export const concept = createStore({
     count: 0,
     text: 'Hello'
   },
-  actions: ({ states, actions, selectors }) => ({
+  actions: ({ states }) => ({
     incrementTaskId: () => {
       states.taskId++;
     },
@@ -27,14 +27,23 @@ export const concept = createStore({
     },
     setText: (text: string) => {
       states.text = text;
+    },
+    complexAction: (params: { id: number; name: string; enabled: boolean }) => {
+      console.log(
+        `Complex action with id=${params.id}, name=${params.name}, enabled=${params.enabled}`
+      );
+      states.text = params.name;
     }
   }),
-  selectors: ({ states, actions, selectors }) => ({
+  selectors: ({ states }) => ({
     getText: () => {
       return states.text;
     },
     isTheme: (payload: 'light' | 'dark') => {
       return states.theme === payload;
+    },
+    complexSelector: (params: { min: number; max: number }) => {
+      return states.count >= params.min && states.count <= params.max;
     }
   })
 });
@@ -44,15 +53,28 @@ export function Concept() {
   const theme = concept.use((s) => s.theme);
   console.log('isDarkTheme', isDarkTheme);
 
+  const handleComplexAction = () => {
+    concept.dispatch.complexAction({
+      id: 123,
+      name: 'Test',
+      enabled: true
+    });
+  };
+
+  const inRange = concept.useSelector.complexSelector({ min: 0, max: 10 });
+
   return (
     <div>
       Theme: {theme}
       <br />
       Is dark theme: {isDarkTheme ? 'yes' : 'no'}
+      <br />
+      Count in range: {inRange ? 'yes' : 'no'}
       <div>
         <button onClick={() => concept.dispatch.toggleTheme()}>
           Toggle theme
         </button>
+        <button onClick={handleComplexAction}>Complex Action</button>
       </div>
     </div>
   );
