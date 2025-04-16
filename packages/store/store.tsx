@@ -1,6 +1,6 @@
 'use client';
 
-import React, {
+import {
   createContext,
   createElement,
   useCallback,
@@ -24,8 +24,8 @@ type SelectorsContext<TState, TSelectors> = (store: {
 }) => TSelectors;
 type StoreProps<TState, TActions, TSelectors> = {
   states: TState;
-  actions: ActionsContext<TState, TActions, TSelectors>;
-  selectors: SelectorsContext<TState, TSelectors>;
+  actions?: ActionsContext<TState, TActions, TSelectors>;
+  selectors?: SelectorsContext<TState, TSelectors>;
   config?: {
     name?: string;
     devtools?: boolean;
@@ -249,16 +249,22 @@ export function createStore<
     }
   }
 
-  // Actions
-  const actions = props.actions({
-    states: statesProxy,
-    actions: actionProxy,
-    selectors: selectorProxy
-  });
-  const selectors = props.selectors({
-    states: statesProxy,
-    selectors: selectorProxy
-  });
+  // Initialize actions and selectors with provided functions or empty objects
+  const actions = props.actions
+    ? props.actions({
+        states: statesProxy,
+        actions: actionProxy,
+        selectors: selectorProxy
+      })
+    : ({} as TActions);
+
+  const selectors = props.selectors
+    ? props.selectors({
+        states: statesProxy,
+        selectors: selectorProxy
+      })
+    : ({} as TSelectors);
+
   Object.assign(actionProxy, actions);
   Object.assign(selectorProxy, selectors);
 
@@ -502,7 +508,6 @@ export function createStore<
   };
 }
 
-// Export a createScopedStore for component-level state management
 export function createScopedStore<
   TState extends Record<string, unknown> = AnyType,
   TActions extends Record<string, StoreActionFunction<AnyType>> = AnyType,
@@ -542,122 +547,3 @@ export function createScopedStore<
 
   return { Provider, useStore };
 }
-
-// EXAMPLE:
-
-type City = 'New York' | 'Los Angeles' | 'Chicago';
-type StateType = {
-  name: string;
-  age: number;
-  city: City;
-};
-type ActionType = {
-  setName(name: string): string;
-  toggleAdult(): number;
-  reset(): void;
-};
-type SelectorType = {
-  isAdult(): boolean;
-  isFrom(city: City): boolean;
-};
-export const store = createStore<StateType, ActionType, SelectorType>({
-  states: {
-    name: 'John',
-    age: 20,
-    city: 'New York'
-  },
-  actions: ({ states, actions }) => ({
-    setName: (name: string) => {
-      states.name = name;
-      return states.name;
-    },
-    toggleAdult: () => {
-      states.age = states.age >= 18 ? 0 : 18;
-      return states.age;
-    },
-    reset: () => {
-      states.name = '';
-      states.age = 0;
-      states.city = 'New York';
-    }
-  }),
-  selectors: ({ states, selectors }) => ({
-    isAdult: () => states.age >= 18,
-    isFrom: (city: City) => {
-      if (selectors.isAdult()) {
-        return true;
-      }
-      return states.city === city;
-    }
-  }),
-  config: {
-    name: 'UserStore',
-    devtools: true
-  }
-});
-
-const btnStyle =
-  'bg-gray-200 text-gray-800 active:bg-gray-300 rounded-md px-4 py-2 m-1';
-export const StoreExamples = () => {
-  const name = store.use((s) => s.name);
-  const age = store.use((s) => s.age);
-  const isAdultCb = store.use.isAdult();
-
-  return (
-    <div className="rounded border p-4">
-      <div className="mb-4">
-        <div>
-          <strong>Name:</strong> {name}
-        </div>
-        <div>
-          <strong>Age:</strong> {age}
-        </div>
-        <div>
-          <strong>IsAdult:</strong> {isAdultCb ? 'Yes' : 'No'}
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          className={btnStyle}
-          onClick={() =>
-            store.dispatch.setName('John' + Math.random().toFixed(2))
-          }
-        >
-          Change Name
-        </button>
-        <button
-          className={btnStyle}
-          onClick={() => store.dispatch.toggleAdult()}
-        >
-          Toggle Adult
-        </button>
-        <button
-          className={btnStyle}
-          onClick={() => {
-            // Using batch for multiple operations
-            store.batch(() => {
-              store.dispatch.setName('Silent' + Math.random().toFixed(2));
-              // No notification until batch ends
-            });
-          }}
-        >
-          Batched Name
-        </button>
-        <button
-          className={btnStyle}
-          onClick={() =>
-            store.batch(() => {
-              store.dispatch.setName('Batched' + Math.random().toFixed(2));
-              store.dispatch.toggleAdult();
-            })
-          }
-        >
-          Batch Multiple
-        </button>
-        <button className={btnStyle} onClick={() => store.reset()}>
-          Reset
-        </button>
-      </div>
-    </div>
-  );
-};
