@@ -13,27 +13,31 @@ export const store = createStore({
     count: 0,
     text: 'Hello'
   },
-  actions: {
-    incrementTaskId: (state) => {
-      state.taskId++;
+  actions: ({ states }) => ({
+    incrementTaskId: () => {
+      states.taskId++;
     },
-    resetTaskId: (state) => {
-      state.taskId = 1;
+    resetTaskId: () => {
+      states.taskId = 1;
     },
-    toggleTheme: (state) => {
-      state.theme = state.theme === 'light' ? 'dark' : 'light';
+    toggleTheme: () => {
+      states.theme = states.theme === 'light' ? 'dark' : 'light';
     },
-    increment: (state) => {
-      state.count++;
+    increment: () => {
+      states.count++;
     },
-    decrement: (state) => {
-      state.count--;
+    decrement: () => {
+      states.count--;
     },
-    setText: (state, text: string) => {
-      state.text = text;
+    setText: (text: string) => {
+      states.text = text;
     }
-  },
-  selectors: {}
+  }),
+  selectors: ({ states }) => ({
+    getText: () => {
+      return states.text;
+    }
+  })
 });
 
 export const scoped = createScopedStore({
@@ -43,27 +47,31 @@ export const scoped = createScopedStore({
     count: 0,
     text: 'Hello'
   },
-  actions: {
-    incrementTaskId: (state) => {
-      state.taskId++;
+  actions: ({ states }) => ({
+    incrementTaskId: () => {
+      states.taskId++;
     },
-    resetTaskId: (state) => {
-      state.taskId = 1;
+    resetTaskId: () => {
+      states.taskId = 1;
     },
-    toggleTheme: (state) => {
-      state.theme = state.theme === 'light' ? 'dark' : 'light';
+    toggleTheme: () => {
+      states.theme = states.theme === 'light' ? 'dark' : 'light';
     },
-    increment: (state) => {
-      state.count++;
+    increment: () => {
+      states.count++;
     },
-    decrement: (state) => {
-      state.count--;
+    decrement: () => {
+      states.count--;
     },
-    setText: (state, text: string) => {
-      state.text = text;
+    setText: (text: string) => {
+      states.text = text;
     }
-  },
-  selectors: {}
+  }),
+  selectors: ({ states }) => ({
+    getText: () => {
+      return states.text;
+    }
+  })
 });
 
 export const collection = createMap({
@@ -71,14 +79,17 @@ export const collection = createMap({
     text: '',
     completed: false
   },
-  actions: {
+  actions: ({ states }) => ({
     toggle: (state) => {
       state.completed = !state.completed;
+    },
+    text: (text: string) => {
+      states.text = text;
     }
-  },
-  selectors: {
-    isCompleted: (state) => {
-      return state.completed;
+  }),
+  selectors: ({ states }) => ({
+    isCompleted: () => {
+      return states.completed;
     }
-  }
+  })
 });

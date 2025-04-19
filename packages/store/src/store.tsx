@@ -449,11 +449,11 @@ export function createStore<
   const wrappedGetSelectors = Object.keys(selectors).reduce(
     (acc, key) => {
       // Create a wrapper function that calls the original selector
-      acc[key] = function (...args: AnyType) {
+      acc[key] = function (...args: any) {
         // Convert the predefined selector to a regular state selector
         // for use with the memoization system
         const wrappedSelector = (_state: TState) => {
-          return (selectors[key as keyof TSelectors] as AnyType)(...args);
+          return (selectors[key as keyof TSelectors] as any)(...args);
         };
 
         return get(wrappedSelector);
@@ -461,7 +461,7 @@ export function createStore<
 
       return acc;
     },
-    {} as Record<string, AnyType>
+    {} as Record<string, any>
   );
 
   Object.assign(get, wrappedGetSelectors);
@@ -521,11 +521,11 @@ export function createStore<
   const wrappedSelectors = Object.keys(selectors).reduce(
     (acc, key) => {
       // Create a wrapper function that calls the original selector
-      acc[key] = function (...args: AnyType) {
+      acc[key] = function (...args: any) {
         // Convert the predefined selector to a regular state selector
         // for use with the subscription system
         const wrappedSelector = (_state: TState) => {
-          return (selectors[key as keyof TSelectors] as AnyType)(...args);
+          return (selectors[key as keyof TSelectors] as any)(...args);
         };
 
         return use(wrappedSelector);
@@ -533,7 +533,7 @@ export function createStore<
 
       return acc;
     },
-    {} as Record<string, AnyType>
+    {} as Record<string, any>
   );
 
   Object.assign(use, wrappedSelectors);

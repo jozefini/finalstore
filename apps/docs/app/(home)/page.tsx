@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { Github } from 'lucide-react';
 
-import { StoreExamples } from '../../../../packages/store/store';
+import {
+  MapExample,
+  StoreExample
+} from '../../../../packages/store/src/concept';
 import { TodoControls } from './components/collection/todo-controls';
 import { TodoList } from './components/collection/todo-list';
 import { Counter } from './components/store/counter-text';
@@ -16,8 +19,8 @@ export default function HomePage() {
         <h1 className="text-6xl font-bold tracking-tight">
           Type-safe state management for React
         </h1>
-        <StoreExamples />
-        <StoreExamples />
+        <StoreExample />
+        <MapExample />
         <p className="text-fd-muted-foreground mt-4 text-xl">
           Simple yet powerful state management with first-class TypeScript
           support. Zero configuration, built-in DevTools, and collection
