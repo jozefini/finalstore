@@ -8,11 +8,8 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useSyncExternalStore,
-  type ReactNode
+  useSyncExternalStore
 } from 'react';
-
-import { isDeepEqual } from './store';
 
 /* eslint-disable-next-line */
 /* eslint-disable react-hooks/rules-of-hooks */
@@ -54,11 +51,6 @@ type MapSubscribers<States> = {
   keys: Map<number, Subscriber<string[]>>;
 };
 
-type MapActionFunction<TState, TPayload = void> = (
-  state: TState,
-  payload?: TPayload
-) => unknown | Promise<unknown>;
-
 type MapSelectorFunction<TState, TPayload = void> = (
   state: TState,
   payload?: TPayload
@@ -66,28 +58,6 @@ type MapSelectorFunction<TState, TPayload = void> = (
 
 type ActionType = (...args: any[]) => any;
 type SelectorType = (...args: any[]) => any;
-
-type MapContext<
-  TState,
-  TActions extends Record<string, MapActionFunction<TState, AnyType>>,
-  TSelectors extends Record<string, MapSelectorFunction<TState, AnyType>>
-> = {
-  states: TState;
-  actions: TActions;
-  selectors: TSelectors;
-  map: InferMap<TState, TActions, TSelectors>;
-};
-
-type ActionsContext<
-  TState,
-  TActions extends Record<string, MapActionFunction<TState, AnyType>>,
-  TSelectors extends Record<string, MapSelectorFunction<TState, AnyType>>
-> = (context: MapContext<TState, TActions, TSelectors>) => TActions;
-
-type SelectorsContext<
-  TState,
-  TSelectors extends Record<string, MapSelectorFunction<TState, AnyType>>
-> = (context: { states: TState; selectors: TSelectors }) => TSelectors;
 
 type CreateMapProps<
   TState = any,
@@ -153,7 +123,6 @@ type InferMap<
 // Add batcher utility
 const createBatcher = () => {
   let isBatching = false;
-  let notifyQueued = false;
   let notifyCallback: (() => void) | null = null;
 
   const batch = (fn: () => void, notify: () => void) => {
@@ -169,7 +138,6 @@ const createBatcher = () => {
         if (notifyCallback) {
           const cb = notifyCallback;
           notifyCallback = null;
-          notifyQueued = false;
           cb();
         }
       }
@@ -177,7 +145,6 @@ const createBatcher = () => {
       // If already batching, just execute the function
       // and queue notification for the parent batch
       fn();
-      notifyQueued = true;
     }
   };
 
@@ -223,7 +190,7 @@ export function createMap<
   };
 
   // Create batcher for update batching
-  const { batch, shouldNotify } = createBatcher();
+  const { batch } = createBatcher();
 
   // Throttled notification mechanism with a reasonable default (16ms is roughly 60fps)
   const notificationThrottle = 16;
@@ -278,12 +245,6 @@ export function createMap<
     }
   };
 
-  // Schedule a state for reference update before notification
-  const scheduleReferenceUpdate = (key: string) => {
-    pendingReferenceUpdates.add(key);
-    scheduleNotification(key);
-  };
-
   // DevTools setup
   let devTools: DevTools | null = null;
   let pauseDevTools = false;
@@ -324,7 +285,7 @@ export function createMap<
                 notifyKeysSubscribers();
                 pauseDevTools = false;
               } catch (error) {
-                console.error('Failed to parse jump state:', error);
+                // console.error('Failed to parse jump state:', error)
               }
               break;
             case 'RESET':
@@ -675,57 +636,12 @@ export function createMap<
     return useSyncExternalStore(subscribeToKeys, getSnapshot, getSnapshot);
   }
 
-  function get(key: string): TState | undefined;
-  function get<T>(key: string, selector: (state: TState) => T): T | undefined;
-  function get<T>(
-    key: string,
-    selector?: (state: TState) => T
-  ): TState | T | undefined {
-    const state = states.get(key);
-    if (!state) return undefined;
-    if (!selector) return state;
-    return selector(state);
-  }
-
   function getSize() {
     return states.size;
   }
 
   function getKeys() {
     return Array.from(states.keys());
-  }
-
-  async function dispatch<K extends keyof TActions>(
-    key: string,
-    type: K,
-    payload?: Parameters<TActions[K]>[1]
-  ): Promise<ReturnType<TActions[K]> | undefined> {
-    if (!actions) return;
-
-    const state = states.get(key);
-    if (!state) return;
-
-    const cb = actions[type];
-    if (typeof cb !== 'function') return;
-
-    // Always create a new state object to ensure reactivity
-    const newState = createStateReference(state);
-
-    const result = cb(newState, payload);
-    const finalResult = result instanceof Promise ? await result : result;
-
-    states.set(key, newState);
-
-    if (devTools && !pauseDevTools) {
-      devTools.send(
-        { type: `${String(type)}@${key}`, payload },
-        Object.fromEntries(states)
-      );
-    }
-
-    scheduleNotification(key);
-
-    return finalResult as ReturnType<TActions[K]>;
   }
 
   // Create key-specific actions that update with fresh state
