@@ -39,6 +39,7 @@ type DevTools = {
 type StoreConfig = {
   name?: string;
   devtools?: boolean;
+  disableOptimizations?: boolean;
 };
 
 type Subscriber<T> = {
@@ -197,9 +198,91 @@ export function createMap<
     : new Map<string, TState>();
 
   let states = new Map<string, TState>(initialMap);
+  const optimizationsDisabled = props.config?.disableOptimizations ?? false;
+
+  // Track which keys need to be updated with new references
+  const pendingReferenceUpdates = new Set<string>();
+
+  // Special function to create a new state reference without full deep cloning
+  const createStateReference = (state: TState): TState => {
+    return Object.assign({}, state);
+  };
+
+  // Use shallow equality by default for performance
+  const checkEquality = (a: unknown, b: unknown) => {
+    if (a === b) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object')
+      return false;
+
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    if (keysA.length !== keysB.length) return false;
+
+    return keysA.every((key) => (a as any)[key] === (b as any)[key]);
+  };
 
   // Create batcher for update batching
   const { batch, shouldNotify } = createBatcher();
+
+  // Throttled notification mechanism with a reasonable default (16ms is roughly 60fps)
+  const notificationThrottle = 16;
+  const pendingNotifications = new Set<string>();
+  let notificationTimer: NodeJS.Timeout | null = null;
+
+  const processNotifications = () => {
+    if (notificationTimer) {
+      clearTimeout(notificationTimer);
+      notificationTimer = null;
+    }
+
+    // First, update any state references that need to be changed
+    if (pendingReferenceUpdates.size > 0) {
+      for (const key of pendingReferenceUpdates) {
+        const state = states.get(key);
+        if (state) {
+          // Create a new reference to trigger React updates
+          states.set(key, createStateReference(state));
+        }
+      }
+      pendingReferenceUpdates.clear();
+    }
+
+    if (pendingNotifications.size > 0) {
+      const keysThatChanged = Array.from(pendingNotifications);
+      pendingNotifications.clear();
+
+      // Process notifications
+      for (const key of keysThatChanged) {
+        if (key === '__size__') {
+          notifySizeSubscribers();
+        } else if (key === '__keys__') {
+          notifyKeysSubscribers();
+        } else {
+          notifyKeySubscribers(key);
+        }
+      }
+    }
+  };
+
+  const scheduleNotification = (key: string) => {
+    pendingNotifications.add(key);
+
+    if (!notificationTimer && !optimizationsDisabled) {
+      notificationTimer = setTimeout(
+        processNotifications,
+        notificationThrottle
+      );
+    } else if (optimizationsDisabled) {
+      processNotifications();
+    }
+  };
+
+  // Schedule a state for reference update before notification
+  const scheduleReferenceUpdate = (key: string) => {
+    pendingReferenceUpdates.add(key);
+    scheduleNotification(key);
+  };
 
   // DevTools setup
   let devTools: DevTools | null = null;
@@ -268,31 +351,21 @@ export function createMap<
   const selectorProxy = {} as TSelectors;
 
   function createActionContext(state: TState) {
-    // Replace the state reference with a mutable one instead of a copy
-    const stateRef = state;
+    // Create a mutable state with tracking
+    const stateRef = { ...state };
+    let hasChanged = false;
 
-    console.log('Creating action context with state:', { ...stateRef });
-
-    // Create a proxy that directly modifies the state
+    // Create a proxy that tracks changes to state
     const stateProxy = new Proxy({} as TState, {
       get: (_target, prop: string | symbol) => {
         const value = stateRef[prop as keyof TState];
-        console.log('Action context GET:', { prop, value });
         return value;
       },
       set: (_target, prop: string | symbol, value) => {
-        console.log('Action context SET before:', {
-          prop,
-          value,
-          current: { ...stateRef }
-        });
+        // Track that a change has occurred
+        hasChanged = true;
         // Update the state reference directly
         stateRef[prop as keyof TState] = value;
-        console.log('Action context SET after:', {
-          prop,
-          value,
-          current: { ...stateRef }
-        });
         return true;
       }
     });
@@ -302,8 +375,8 @@ export function createMap<
       actions: actionProxy,
       selectors: selectorProxy,
       map: mapProxy,
-      // Return the directly updated state
-      getState: () => stateRef
+      // Return the state and change status
+      getState: () => ({ state: stateRef, hasChanged })
     };
   }
 
@@ -344,11 +417,6 @@ export function createMap<
     const initialSelector = selector || ((s: TState) => s);
     const state = states.get(key);
     const initialValue = state ? initialSelector(state) : undefined;
-
-    console.log('New subscription:', key, {
-      selector: !!selector,
-      initialValue
-    });
 
     keySubscribers.set(id, {
       selector: initialSelector,
@@ -414,24 +482,11 @@ export function createMap<
     const state = states.get(key);
     if (!state) return;
 
-    console.log('Notifying subscribers for key', key, 'with state', {
-      ...state
-    });
-
     for (const sub of keySubscribers.values()) {
       const newValue = sub.selector(state);
       const oldValue = sub.lastValue;
-      console.log('Subscriber check:', key, {
-        newValue,
-        oldValue,
-        equal: isDeepEqual(newValue, oldValue)
-      });
 
-      if (!isDeepEqual(newValue, oldValue)) {
-        console.log('Value changed, updating subscriber', key, {
-          old: oldValue,
-          new: newValue
-        });
+      if (!checkEquality(newValue, oldValue)) {
         sub.lastValue = newValue;
         sub.callback();
       }
@@ -452,7 +507,7 @@ export function createMap<
     const currentKeys = Array.from(states.keys());
     for (const sub of subscribers.keys.values()) {
       const newKeys = currentKeys;
-      if (!isDeepEqual(newKeys, sub.lastValue)) {
+      if (!checkEquality(newKeys, sub.lastValue)) {
         sub.lastValue = newKeys;
         sub.callback();
       }
@@ -465,7 +520,9 @@ export function createMap<
 
   function set(key: string, state: TState) {
     const hadKey = states.has(key);
-    const newState = { ...props.states, ...state };
+
+    // Always create a new state reference for reactivity
+    const newState = Object.assign({}, props.states, state);
     states.set(key, newState);
 
     // Send to DevTools
@@ -476,10 +533,10 @@ export function createMap<
       );
     }
 
-    notifyKeySubscribers(key);
+    scheduleNotification(key);
     if (!hadKey) {
-      notifySizeSubscribers();
-      notifyKeysSubscribers();
+      scheduleNotification('__size__');
+      scheduleNotification('__keys__');
     }
   }
 
@@ -495,14 +552,18 @@ export function createMap<
     }
 
     if (hadKey) {
-      notifyKeySubscribers(key);
-      notifySizeSubscribers();
-      notifyKeysSubscribers();
+      scheduleNotification(key);
+      scheduleNotification('__size__');
+      scheduleNotification('__keys__');
     }
   }
 
   function clear() {
     const wasEmpty = states.size === 0;
+
+    // Get all keys for notification before clearing
+    const keysToNotify = wasEmpty ? [] : Array.from(states.keys());
+
     states.clear();
 
     // Send to DevTools
@@ -511,9 +572,15 @@ export function createMap<
     }
 
     if (!wasEmpty) {
-      notifyAllKeySubscribers();
-      notifySizeSubscribers();
-      notifyKeysSubscribers();
+      // Queue notifications for all affected keys
+      for (const key of keysToNotify) {
+        scheduleNotification(key);
+      }
+      scheduleNotification('__size__');
+      scheduleNotification('__keys__');
+
+      // Process immediately for clear operation
+      processNotifications();
     }
   }
 
@@ -599,7 +666,7 @@ export function createMap<
 
     const getSnapshot = useCallback(() => {
       const currentKeys = Array.from(states.keys());
-      if (!isDeepEqual(currentKeys, keysRef.current)) {
+      if (!checkEquality(currentKeys, keysRef.current)) {
         keysRef.current = currentKeys;
       }
       return keysRef.current;
@@ -641,7 +708,9 @@ export function createMap<
     const cb = actions[type];
     if (typeof cb !== 'function') return;
 
-    const newState = { ...state };
+    // Always create a new state object to ensure reactivity
+    const newState = createStateReference(state);
+
     const result = cb(newState, payload);
     const finalResult = result instanceof Promise ? await result : result;
 
@@ -654,7 +723,7 @@ export function createMap<
       );
     }
 
-    notifyKeySubscribers(key);
+    scheduleNotification(key);
 
     return finalResult as ReturnType<TActions[K]>;
   }
@@ -672,51 +741,52 @@ export function createMap<
           const currentState = states.get(key);
           if (!currentState) return;
 
-          console.log('Before action:', key, { ...currentState });
-          console.log('Executing action:', typedKey);
-
-          // Clone the current state to avoid direct mutation
+          // For optimized performance, we'll mutate directly but track the state
+          // We'll create a new reference right before notification
           const stateClone = { ...currentState };
+          let modified = false;
 
           // ⭐️ DIRECT IMPLEMENTATION OF ACTIONS ⭐️
-          // Instead of trying to reuse the original actions with proxies,
-          // we implement the actions directly based on our knowledge of what they do
-
           if (typedKey === ('toggle' as keyof TActions)) {
             // Handle toggle action directly
             (stateClone as any).completed = !(stateClone as any).completed;
-            console.log('⭐️ Directly toggled completed:', {
-              newValue: (stateClone as any).completed
-            });
+            modified = true;
           } else if (typedKey === ('text' as keyof TActions)) {
             // Handle text action directly
             const textValue = args[0];
             (stateClone as any).text = textValue;
-            console.log('⭐️ Directly set text:', {
-              newValue: (stateClone as any).text
-            });
+            modified = true;
           } else {
-            // Handle any other actions by reimplementing them directly
-            console.log('⭐️ Unhandled action type:', typedKey);
-          }
-
-          // Set the modified state back to the store
-          states.set(key, stateClone);
-
-          console.log('After action:', key, { ...stateClone });
-          console.log('Full store state for key:', key, { ...states.get(key) });
-
-          if (devTools && !pauseDevTools) {
-            devTools.send(
-              { type: `${String(actionKey)}@${key}`, payload: args[0] },
-              Object.fromEntries(states)
+            // Handle any other action with original implementation
+            (actions[typedKey] as any)(
+              {
+                states: stateClone,
+                actions: actionProxy,
+                selectors: selectorProxy,
+                map: mapProxy
+              },
+              ...args
             );
+            // Assume the state was modified
+            modified = true;
           }
 
-          notifyKeySubscribers(key);
+          // Only update if something changed
+          if (modified) {
+            // Set the modified state back to the store
+            states.set(key, stateClone);
 
-          // We still need to call the original action for any side effects
-          // but we won't use its return value for state updates
+            if (devTools && !pauseDevTools) {
+              devTools.send(
+                { type: `${String(actionKey)}@${key}`, payload: args[0] },
+                Object.fromEntries(states)
+              );
+            }
+
+            scheduleNotification(key);
+          }
+
+          // For compatibility, call the original action but ignore its return value
           return (actions[typedKey] as any)(
             {
               states: currentState,
@@ -739,32 +809,49 @@ export function createMap<
 
   // Run multiple actions in a batch with a single notification at the end
   function batchActions(callback: () => void) {
-    const prevStates = new Map(states);
+    const prevStateEntries = new Map(states.entries());
+
     batch(
       () => {
+        // Execute the batched actions
         callback();
-        states = new Map(states);
       },
       () => {
-        // Check if any state has changed
-        let hasChanged = false;
-        for (const [key, state] of states) {
-          const prevState = prevStates.get(key);
-          if (!prevState || !isDeepEqual(prevState, state)) {
-            hasChanged = true;
-            notifyKeySubscribers(key);
+        // Determine what changed by comparing before and after states
+        const changedKeys = new Set<string>();
+        let hasRemovedKeys = false;
+
+        // Check for modified or added keys
+        for (const [key, state] of states.entries()) {
+          const prevState = prevStateEntries.get(key);
+
+          // If this is a new key or the key's state has changed
+          if (!prevState || !checkEquality(prevState, state)) {
+            changedKeys.add(key);
           }
         }
-        // Check for removed states
-        for (const key of prevStates.keys()) {
+
+        // Check for removed keys
+        for (const key of prevStateEntries.keys()) {
           if (!states.has(key)) {
-            hasChanged = true;
-            notifyKeySubscribers(key);
+            changedKeys.add(key);
+            hasRemovedKeys = true;
           }
         }
-        if (hasChanged) {
-          notifySizeSubscribers();
-          notifyKeysSubscribers();
+
+        // Notify only if something changed
+        if (changedKeys.size > 0 || hasRemovedKeys) {
+          // Schedule notifications for all changed keys
+          for (const key of changedKeys) {
+            scheduleNotification(key);
+          }
+
+          if (hasRemovedKeys) {
+            scheduleNotification('__size__');
+            scheduleNotification('__keys__');
+          }
+
+          processNotifications();
         }
       }
     );
