@@ -3,6 +3,7 @@ import { Github } from 'lucide-react';
 
 import {
   MapExample,
+  MapStressTest,
   StoreExample
 } from '../../../../packages/store/src/concept';
 import { TodoControls } from './components/collection/todo-controls';
@@ -21,6 +22,7 @@ export default function HomePage() {
         </h1>
         <StoreExample />
         <MapExample />
+        <MapStressTest />
         <p className="text-fd-muted-foreground mt-4 text-xl">
           Simple yet powerful state management with first-class TypeScript
           support. Zero configuration, built-in DevTools, and collection

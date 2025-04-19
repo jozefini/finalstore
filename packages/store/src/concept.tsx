@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { createMap, createStore } from './index';
 
@@ -192,6 +192,38 @@ const TodoList = () => {
     </div>
   );
 };
+
+// Create stress test map outside component to prevent recreation on renders
+export const stressMap = createMap<
+  { value: number; lastUpdated: number },
+  {
+    increment: () => void;
+    update: (value: number) => void;
+  },
+  {
+    isEven: () => boolean;
+  }
+>({
+  states: {
+    value: 0,
+    lastUpdated: Date.now()
+  },
+  actions: ({ states }) => ({
+    increment: () => {
+      states.value += 1;
+      states.lastUpdated = Date.now();
+    },
+    update: (value: number) => {
+      states.value = value;
+      states.lastUpdated = Date.now();
+    }
+  }),
+  selectors: ({ states }) => ({
+    isEven: () => {
+      return states.value % 2 === 0;
+    }
+  })
+});
 
 export function StoreExample() {
   // Basic state usage
@@ -497,6 +529,288 @@ export function MapExample() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+export function MapStressTest() {
+  // Use the globally defined stressMap instead of creating a new one
+  // Stats
+  const totalItems = stressMap.useSize();
+  const keys = stressMap.useKeys();
+
+  // Performance timers
+  const startTime = useRef(0);
+  const [lastOperationTime, setLastOperationTime] = useState(0);
+  const [memoryUsage, setMemoryUsage] = useState<string>('');
+  const [status, setStatus] = useState('Ready');
+
+  // Starts performance timing
+  const startTiming = () => {
+    startTime.current = performance.now();
+    setStatus('Running...');
+  };
+
+  // Ends performance timing
+  const endTiming = () => {
+    const time = performance.now() - startTime.current;
+    setLastOperationTime(time);
+    setStatus('Completed');
+
+    // Attempt to get memory usage if available
+    if (window.performance) {
+      try {
+        // Define an interface for Chrome's non-standard memory API
+        interface MemoryInfo {
+          usedJSHeapSize: number;
+          totalJSHeapSize: number;
+          jsHeapSizeLimit: number;
+        }
+
+        // Access the memory property safely - this is Chrome-specific
+        const performanceWithMemory = window.performance as unknown as {
+          memory?: MemoryInfo;
+        };
+
+        if (performanceWithMemory.memory) {
+          const memory = performanceWithMemory.memory;
+          const usedHeapSize = Math.round(
+            memory.usedJSHeapSize / (1024 * 1024)
+          );
+          const totalHeapSize = Math.round(
+            memory.totalJSHeapSize / (1024 * 1024)
+          );
+          setMemoryUsage(`${usedHeapSize}MB / ${totalHeapSize}MB`);
+        }
+      } catch (e) {
+        // Silently fail if memory API is not available
+      }
+    }
+  };
+
+  // Create 10,000 items
+  const createManyItems = () => {
+    const count = 10000;
+    startTiming();
+    stressMap.batch(() => {
+      for (let i = 0; i < count; i++) {
+        stressMap.key(`item-${i}`).set({
+          value: i,
+          lastUpdated: Date.now()
+        });
+      }
+    });
+    endTiming();
+  };
+
+  // Create 40,000 items
+  const createMaxItems = () => {
+    const count = 40000;
+    startTiming();
+    stressMap.batch(() => {
+      for (let i = 0; i < count; i++) {
+        stressMap.key(`item-${i}`).set({
+          value: i,
+          lastUpdated: Date.now()
+        });
+      }
+    });
+    endTiming();
+  };
+
+  // Update 1,000 random items
+  const updateManyRandomItems = () => {
+    if (keys.length === 0) {
+      setStatus('No items to update');
+      return;
+    }
+
+    const count = Math.min(1000, keys.length);
+    startTiming();
+    stressMap.batch(() => {
+      // Get a random sample of keys
+      const randomKeys = [...keys]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, count);
+
+      // Update each key
+      randomKeys.forEach((key) => {
+        stressMap.key(key).dispatch.update(Math.floor(Math.random() * 1000));
+      });
+    });
+    endTiming();
+  };
+
+  // Update all items one by one (not batched)
+  const updateAllItemsSequentially = () => {
+    if (keys.length === 0) {
+      setStatus('No items to update');
+      return;
+    }
+
+    startTiming();
+    // Not using batch to test individual updates
+    keys.forEach((key) => {
+      stressMap.key(key).dispatch.increment();
+    });
+    endTiming();
+  };
+
+  // Update all items in a batch
+  const updateAllItemsBatched = () => {
+    if (keys.length === 0) {
+      setStatus('No items to update');
+      return;
+    }
+
+    startTiming();
+    stressMap.batch(() => {
+      keys.forEach((key) => {
+        stressMap.key(key).dispatch.increment();
+      });
+    });
+    endTiming();
+  };
+
+  // Read 1000 random items
+  const readManyRandomItems = () => {
+    if (keys.length === 0) {
+      setStatus('No items to read');
+      return;
+    }
+
+    const count = Math.min(1000, keys.length);
+    startTiming();
+
+    // Get a random sample of keys
+    const randomKeys = [...keys]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, count);
+
+    // Read each key
+    let total = 0;
+    randomKeys.forEach((key) => {
+      const value = stressMap.key(key).get((s) => s.value);
+      if (value !== undefined) {
+        total += value;
+      }
+      // Also test the selector
+      const isEven = stressMap.key(key).get.isEven();
+    });
+
+    endTiming();
+    setStatus(`Read complete. Sum: ${total}`);
+  };
+
+  // Clear all items
+  const clearAllItems = () => {
+    startTiming();
+    stressMap.clear();
+    endTiming();
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl p-6">
+      <h2 className="mb-6 text-2xl font-bold text-gray-900">
+        Map Store Stress Test
+      </h2>
+
+      <div className="mb-6 grid grid-cols-2 gap-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="rounded-md bg-blue-50 p-4 text-center">
+          <div className="text-sm text-blue-600">Total Items</div>
+          <div className="text-3xl font-bold text-blue-800">{totalItems}</div>
+        </div>
+
+        <div className="rounded-md bg-green-50 p-4 text-center">
+          <div className="text-sm text-green-600">Last Operation Time</div>
+          <div className="text-3xl font-bold text-green-800">
+            {lastOperationTime.toFixed(2)} ms
+          </div>
+        </div>
+
+        {memoryUsage && (
+          <div className="col-span-2 rounded-md bg-purple-50 p-4 text-center">
+            <div className="text-sm text-purple-600">Memory Usage</div>
+            <div className="text-xl font-bold text-purple-800">
+              {memoryUsage}
+            </div>
+          </div>
+        )}
+
+        <div className="col-span-2 rounded-md bg-gray-50 p-4 text-center">
+          <div className="text-sm text-gray-600">Status</div>
+          <div className="text-xl font-bold text-gray-800">{status}</div>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-medium text-gray-900">
+          Creation Tests
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <button
+            onClick={createManyItems}
+            className="rounded-md bg-blue-600 px-4 py-3 text-white transition-colors hover:bg-blue-700"
+          >
+            Create 10,000 Items
+          </button>
+
+          <button
+            onClick={createMaxItems}
+            className="rounded-md bg-indigo-600 px-4 py-3 text-white transition-colors hover:bg-indigo-700"
+          >
+            Create 40,000 Items
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-medium text-gray-900">Update Tests</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <button
+            onClick={updateManyRandomItems}
+            className="rounded-md bg-green-600 px-4 py-3 text-white transition-colors hover:bg-green-700"
+          >
+            Update 1,000 Random Items
+          </button>
+
+          <button
+            onClick={updateAllItemsSequentially}
+            className="rounded-md bg-yellow-600 px-4 py-3 text-white transition-colors hover:bg-yellow-700"
+          >
+            Update All Items (Sequential)
+          </button>
+
+          <button
+            onClick={updateAllItemsBatched}
+            className="rounded-md bg-orange-600 px-4 py-3 text-white transition-colors hover:bg-orange-700"
+          >
+            Update All Items (Batched)
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-medium text-gray-900">Read Tests</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <button
+            onClick={readManyRandomItems}
+            className="rounded-md bg-purple-600 px-4 py-3 text-white transition-colors hover:bg-purple-700"
+          >
+            Read 1,000 Random Items
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-medium text-gray-900">Cleanup</h3>
+        <button
+          onClick={clearAllItems}
+          className="w-full rounded-md bg-red-600 px-4 py-3 text-white transition-colors hover:bg-red-700"
+        >
+          Clear All Items
+        </button>
       </div>
     </div>
   );
