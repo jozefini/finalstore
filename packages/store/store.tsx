@@ -356,20 +356,20 @@ export function createStore<
         if (result instanceof Promise) {
           // For async actions, return the Promise chain
           return dispatch(actionKey, payload);
-        } else {
-          // For sync actions, execute immediately and return the result
-
-          // Send to DevTools
-          if (devTools && !pauseDevTools) {
-            devTools.send({ type: String(actionKey), payload }, states);
-          }
-
-          if (shouldNotify()) {
-            notify();
-          }
-
-          return result;
         }
+
+        // For sync actions, execute immediately and return the result
+
+        // Send to DevTools
+        if (devTools && !pauseDevTools) {
+          devTools.send({ type: String(actionKey), payload }, states);
+        }
+
+        if (shouldNotify()) {
+          notify();
+        }
+
+        return result;
       };
       return acc;
     }, {} as AnyType);

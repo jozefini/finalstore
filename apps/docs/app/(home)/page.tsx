@@ -1,11 +1,13 @@
 import Link from 'next/link';
-import { Window } from './components/ui/window';
-import { ThemeToggle } from './components/store/theme-toggle';
-import { Counter } from './components/store/counter-text';
-import { TextControl } from './components/store/text-control';
+import { Github } from 'lucide-react';
+
+import { StoreExamples } from '../../../../packages/store/store';
 import { TodoControls } from './components/collection/todo-controls';
 import { TodoList } from './components/collection/todo-list';
-import { Github } from 'lucide-react';
+import { Counter } from './components/store/counter-text';
+import { TextControl } from './components/store/text-control';
+import { ThemeToggle } from './components/store/theme-toggle';
+import { Window } from './components/ui/window';
 
 export default function HomePage() {
   return (
@@ -14,6 +16,8 @@ export default function HomePage() {
         <h1 className="text-6xl font-bold tracking-tight">
           Type-safe state management for React
         </h1>
+        <StoreExamples />
+        <StoreExamples />
         <p className="text-fd-muted-foreground mt-4 text-xl">
           Simple yet powerful state management with first-class TypeScript
           support. Zero configuration, built-in DevTools, and collection
