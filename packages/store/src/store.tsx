@@ -17,18 +17,27 @@ import {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 type AnyType = any;
-type ActionsContext<TState, TActions, TSelectors> = (store: {
+type ActionsContext<TState, TActions, TSelectors, TEvents> = (store: {
   states: TState;
   actions: TActions;
   selectors: TSelectors;
+  trigger: <TEventName extends keyof TEvents>(
+    eventName: TEventName,
+    payload: EventPayload<TEvents, TEventName>
+  ) => void;
 }) => TActions;
 type SelectorsContext<TState, TSelectors> = (store: {
   states: TState;
   selectors: TSelectors;
 }) => TSelectors;
-type StoreProps<TState, TActions, TSelectors> = {
+type StoreProps<
+  TState,
+  TActions,
+  TSelectors,
+  TEvents = Record<string, unknown>
+> = {
   states: TState;
-  actions?: ActionsContext<TState, TActions, TSelectors>;
+  actions?: ActionsContext<TState, TActions, TSelectors, TEvents>;
   selectors?: SelectorsContext<TState, TSelectors>;
   config?: {
     name?: string;
@@ -51,6 +60,14 @@ type PayloadByAction<TActions> = {
     : never;
 };
 
+// Event types
+type EventCallback<TPayload = unknown> = (payload: TPayload) => void;
+type EventMap<TEvents> = Map<string, Map<string, EventCallback<any>>>;
+type EventPayload<
+  TEvents,
+  TEventName extends keyof TEvents
+> = TEvents[TEventName];
+
 // DevTools Types
 type DevToolsMessage = {
   type: string;
@@ -68,7 +85,12 @@ type DevTools = {
 };
 
 // Update the InferStore type to match our implementation
-type InferStore<TState, TActions, TSelectors> = {
+type InferStore<
+  TState,
+  TActions,
+  TSelectors,
+  TEvents = Record<string, unknown>
+> = {
   dispatch: TActions;
   use: {
     (): TState;
@@ -84,6 +106,12 @@ type InferStore<TState, TActions, TSelectors> = {
   };
   reset: () => void;
   batch: (callback: () => void) => void; // Batching API
+  on: <TEventName extends keyof TEvents>(
+    id: string,
+    eventName: TEventName,
+    callback: (payload: EventPayload<TEvents, TEventName>) => void
+  ) => void;
+  off: (id: string) => void;
 };
 
 // Utility for batching updates
@@ -121,6 +149,10 @@ const createBatcher = () => {
 };
 
 // HELPERS:
+
+export function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
 
 export function isDeepEqual(a: unknown, b: unknown): boolean {
   // Direct reference equality
@@ -173,12 +205,16 @@ export function createStore<
   TSelectors extends Record<
     string,
     StoreSelectorFunction<AnyType, AnyType>
-  > = AnyType
+  > = AnyType,
+  TEvents extends Record<string, unknown> = Record<string, unknown>
 >(
-  props: StoreProps<TState, TActions, TSelectors>
-): InferStore<TState, TActions, TSelectors> {
-  const initialStates = { ...props.states };
-  let states = { ...initialStates };
+  props: StoreProps<TState, TActions, TSelectors, TEvents>
+): InferStore<TState, TActions, TSelectors, TEvents> {
+  const initialStates = deepClone(props.states);
+  let states = deepClone(initialStates);
+
+  // Create event map
+  const events: EventMap<TEvents> = new Map();
 
   // Create a batcher for update batching
   const { batch, shouldNotify } = createBatcher();
@@ -193,11 +229,6 @@ export function createStore<
       return true;
     }
   });
-
-  const actionProxy =
-    (props?.actions as unknown as TActions) || ({} as TActions);
-  const selectorProxy =
-    (props?.selectors as unknown as TSelectors) || ({} as TSelectors);
 
   // DevTools setup
   let devTools: DevTools | null = null;
@@ -250,12 +281,49 @@ export function createStore<
     }
   }
 
+  // Event management functions
+  function trigger<TEventName extends keyof TEvents>(
+    eventName: TEventName,
+    payload: EventPayload<TEvents, TEventName>
+  ) {
+    const eventCallbacks = events.get(eventName as string);
+    if (eventCallbacks) {
+      eventCallbacks.forEach((callback) => {
+        callback(payload);
+      });
+    }
+  }
+
+  function on<TEventName extends keyof TEvents>(
+    id: string,
+    eventName: TEventName,
+    callback: (payload: EventPayload<TEvents, TEventName>) => void
+  ) {
+    if (!events.has(eventName as string)) {
+      events.set(eventName as string, new Map());
+    }
+    const eventCallbacks = events.get(eventName as string)!;
+    eventCallbacks.set(id, callback as EventCallback);
+  }
+
+  function off(id: string) {
+    events.forEach((eventCallbacks) => {
+      eventCallbacks.delete(id);
+    });
+  }
+
   // Initialize actions and selectors with provided functions or empty objects
+  const actionProxy =
+    (props?.actions as unknown as TActions) || ({} as TActions);
+  const selectorProxy =
+    (props?.selectors as unknown as TSelectors) || ({} as TSelectors);
+
   const actions = props.actions
     ? props.actions({
         states: statesProxy,
         actions: actionProxy,
-        selectors: selectorProxy
+        selectors: selectorProxy,
+        trigger
       })
     : ({} as TActions);
 
@@ -352,7 +420,7 @@ export function createStore<
         const result = cb(payload);
 
         // Create a new reference for the state object so React detects changes
-        states = { ...states };
+        states = deepClone(states);
 
         if (result instanceof Promise) {
           // For async actions, return the Promise chain
@@ -377,11 +445,11 @@ export function createStore<
 
   // Run multiple actions in a batch with a single notification at the end
   function batchActions(callback: () => void) {
-    const prevState = { ...states };
+    const prevState = deepClone(states);
     batch(
       () => {
         callback();
-        states = { ...states };
+        states = deepClone(states);
       },
       () => {
         if (!isDeepEqual(prevState, states)) {
@@ -404,7 +472,7 @@ export function createStore<
     const result = cb(payload);
 
     // Create a new reference for the state object so React detects changes
-    states = { ...states };
+    states = deepClone(states);
 
     // We know this is async at this point
     const finalResult = await result;
@@ -422,7 +490,8 @@ export function createStore<
   // Reset function
   function reset() {
     const prevStates = states;
-    states = { ...initialStates };
+    states = deepClone(initialStates);
+    events.clear(); // Clear all events on reset
 
     // Send to DevTools
     if (devTools && !pauseDevTools) {
@@ -543,7 +612,9 @@ export function createStore<
     use: use as typeof use & TSelectors,
     get: get as typeof get & TSelectors,
     reset,
-    batch: batchActions
+    batch: batchActions,
+    on,
+    off
   };
 }
 
@@ -553,16 +624,17 @@ export function createScopedStore<
   TSelectors extends Record<
     string,
     StoreSelectorFunction<AnyType, AnyType>
-  > = AnyType
->(props: StoreProps<TState, TActions, TSelectors>) {
-  type StoreType = InferStore<TState, TActions, TSelectors>;
+  > = AnyType,
+  TEvents extends Record<string, unknown> = Record<string, unknown>
+>(props: StoreProps<TState, TActions, TSelectors, TEvents>) {
+  type StoreType = InferStore<TState, TActions, TSelectors, TEvents>;
   type ReactNode = React.ReactNode;
 
   const StoreContext = createContext<StoreType | null>(null);
 
   const Provider = ({ children }: { children: ReactNode }) => {
     const store = useMemo(
-      () => createStore<TState, TActions, TSelectors>(props),
+      () => createStore<TState, TActions, TSelectors, TEvents>(props),
       []
     );
 

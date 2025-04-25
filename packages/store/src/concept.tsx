@@ -1,17 +1,43 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { createMap, createStore } from './index';
 
-export const store = createStore({
-  states: {
-    taskId: 1,
-    theme: 'light',
-    count: 0,
-    text: 'Hello'
-  },
-  actions: ({ states }) => ({
+const storeStates = {
+  taskId: 1,
+  theme: 'light' as 'light' | 'dark',
+  count: 0,
+  text: 'Hello'
+};
+type StoreStates = typeof storeStates;
+type StoreActions = {
+  incrementTaskId: () => void;
+  resetTaskId: () => void;
+  toggleTheme: () => void;
+  increment: () => void;
+  decrement: () => void;
+  setText: (text: string) => void;
+};
+type StoreSelectors = {
+  getText: () => string;
+  isTheme: (theme: 'light' | 'dark') => boolean;
+};
+type StoreEvents = {
+  toDarkMode: undefined;
+  themeChange: { theme: 'light' | 'dark' };
+  countChange: { count: number };
+  textChange: { text: string };
+};
+
+export const store = createStore<
+  StoreStates,
+  StoreActions,
+  StoreSelectors,
+  StoreEvents
+>({
+  states: storeStates,
+  actions: ({ states, trigger }) => ({
     incrementTaskId: () => {
       states.taskId++;
     },
@@ -20,9 +46,11 @@ export const store = createStore({
     },
     toggleTheme: () => {
       states.theme = states.theme === 'light' ? 'dark' : 'light';
+      trigger('themeChange', { theme: states.theme });
     },
     increment: () => {
       states.count++;
+      trigger('countChange', { count: states.count });
     },
     decrement: () => {
       states.count--;
@@ -58,11 +86,9 @@ const collection = createMap<
     text: '',
     completed: false
   },
-  actions: ({ states, map }) => ({
+  actions: ({ states }) => ({
     toggle: () => {
-      console.log('Toggle action - before:', { completed: states.completed });
       states.completed = !states.completed;
-      console.log('Toggle action - after:', { completed: states.completed });
     },
     text: (text: string) => {
       states.text = text;
@@ -235,11 +261,22 @@ export function StoreExample() {
   const isDarkTheme = store.use.isTheme('dark');
   const customText = store.use.getText();
 
+  const isCountBetween10And20 = count >= 10 && count <= 20;
+  useEffect(() => {
+    if (isCountBetween10And20) {
+      store.on('ref-04', 'countChange', (payload) => {
+        console.log('countChange between 10 and 20', payload);
+      });
+    } else {
+      store.off('ref-04');
+    }
+  }, [isCountBetween10And20]);
+
   // Example of batched actions
   const handleBatchedActions = () => {
     store.batch(() => {
       store.dispatch.increment();
-      store.dispatch.setText('Updated in batch');
+      // store.dispatch.setText('Updated in batch');
       store.dispatch.toggleTheme();
     });
   };
