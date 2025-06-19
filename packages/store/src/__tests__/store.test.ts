@@ -160,6 +160,172 @@ describe('Store Core Functionality', () => {
     });
   });
 
+  describe('Action Return Values', () => {
+    it('should return values from sync actions', () => {
+      const store = createStore({
+        states: { count: 0 },
+        actions: ({ states }) => ({
+          increment: () => {
+            states.count += 1;
+            return states.count; // Return the new count
+          },
+          multiply: (factor: number) => {
+            states.count *= factor;
+            return {
+              newCount: states.count,
+              factor,
+              message: `Multiplied by ${factor}`
+            };
+          },
+          getString: () => {
+            return `Count is ${states.count}`;
+          }
+        })
+      });
+
+      // Test simple return value
+      const result1 = store.dispatch.increment();
+      expect(result1).toBe(1);
+      expect(store.get((s) => s.count)).toBe(1);
+
+      // Test object return value
+      const result2 = store.dispatch.multiply(5);
+      expect(result2).toEqual({
+        newCount: 5,
+        factor: 5,
+        message: 'Multiplied by 5'
+      });
+      expect(store.get((s) => s.count)).toBe(5);
+
+      // Test string return value
+      const result3 = store.dispatch.getString();
+      expect(result3).toBe('Count is 5');
+    });
+
+    it('should return values from async actions', async () => {
+      const store = createStore({
+        states: {
+          data: null as string | null,
+          processedData: null as string | null
+        },
+        actions: ({ states }) => ({
+          async fetchData(id: number) {
+            // Simulate API call
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            const fetchedData = `data-${id}`;
+            states.data = fetchedData;
+
+            return {
+              id,
+              data: fetchedData,
+              timestamp: Date.now(),
+              success: true
+            };
+          },
+
+          async processData() {
+            if (!states.data) {
+              throw new Error('No data to process');
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 5));
+
+            const processed = states.data.toUpperCase();
+            states.processedData = processed;
+
+            return processed;
+          },
+
+          async calculateSum(numbers: number[]) {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+
+            const sum = numbers.reduce((acc, num) => acc + num, 0);
+            return {
+              numbers,
+              sum,
+              average: sum / numbers.length
+            };
+          }
+        })
+      });
+
+      // Test async action with object return
+      const result1 = await store.dispatch.fetchData(123);
+      expect(result1).toEqual({
+        id: 123,
+        data: 'data-123',
+        timestamp: expect.any(Number),
+        success: true
+      });
+      expect(store.get((s) => s.data)).toBe('data-123');
+
+      // Test async action with string return
+      const result2 = await store.dispatch.processData();
+      expect(result2).toBe('DATA-123');
+      expect(store.get((s) => s.processedData)).toBe('DATA-123');
+
+      // Test async action with calculation return
+      const result3 = await store.dispatch.calculateSum([1, 2, 3, 4, 5]);
+      expect(result3).toEqual({
+        numbers: [1, 2, 3, 4, 5],
+        sum: 15,
+        average: 3
+      });
+    });
+
+    it('should handle void return values', () => {
+      const store = createStore({
+        states: { count: 0 },
+        actions: ({ states }) => ({
+          increment: () => {
+            states.count += 1;
+            // No explicit return (void)
+          },
+          decrement: () => {
+            states.count -= 1;
+            return; // Explicit void return
+          }
+        })
+      });
+
+      const result1 = store.dispatch.increment();
+      expect(result1).toBeUndefined();
+      expect(store.get((s) => s.count)).toBe(1);
+
+      const result2 = store.dispatch.decrement();
+      expect(result2).toBeUndefined();
+      expect(store.get((s) => s.count)).toBe(0);
+    });
+
+    it('should handle async void return values', async () => {
+      const store = createStore({
+        states: { status: 'idle' },
+        actions: ({ states }) => ({
+          async updateStatus() {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            states.status = 'updated';
+            // No explicit return (void)
+          },
+
+          async resetStatus() {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            states.status = 'idle';
+            return; // Explicit void return
+          }
+        })
+      });
+
+      const result1 = await store.dispatch.updateStatus();
+      expect(result1).toBeUndefined();
+      expect(store.get((s) => s.status)).toBe('updated');
+
+      const result2 = await store.dispatch.resetStatus();
+      expect(result2).toBeUndefined();
+      expect(store.get((s) => s.status)).toBe('idle');
+    });
+  });
+
   describe('Selectors', () => {
     it('should create and use custom selectors', () => {
       const initialStates = {
