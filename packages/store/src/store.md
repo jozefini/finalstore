@@ -16,15 +16,15 @@ A lightweight, flexible React state management library with TypeScript support, 
 ## Installation
 
 ```bash
-npm install @your-org/store
+npm install finalstore
 # or
-pnpm add @your-org/store
+pnpm add finalstore
 ```
 
 ## Quick Start
 
 ```tsx
-import { createStore } from '@your-org/store';
+import { createStore } from 'finalstore';
 
 // Define initial state with explicit types
 const initialStates = {
@@ -380,7 +380,7 @@ const store = createStore({
 For component-scoped state, use `createScopedStore`:
 
 ```tsx
-import { createScopedStore } from '@your-org/store';
+import { createScopedStore } from 'finalstore';
 
 const { Provider, useStore } = createScopedStore({
   states: {
