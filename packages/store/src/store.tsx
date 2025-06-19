@@ -150,8 +150,43 @@ const createBatcher = () => {
 
 // HELPERS:
 
-export function deepClone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value));
+export function deepClone<T>(obj: T): T {
+  // Handle primitive types, null, and undefined
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  // Handle Date objects
+  if (obj instanceof Date) {
+    return new Date(obj.getTime()) as any;
+  }
+  // Handle Array objects
+  if (Array.isArray(obj)) {
+    return obj.map((item) => deepClone(item)) as any;
+  }
+  // Handle Map objects
+  if (obj instanceof Map) {
+    const result = new Map();
+    obj.forEach((value, key) => {
+      result.set(deepClone(key), deepClone(value));
+    });
+    return result as any;
+  }
+  // Handle Set objects
+  if (obj instanceof Set) {
+    const result = new Set();
+    obj.forEach((value) => {
+      result.add(deepClone(value));
+    });
+    return result as any;
+  }
+  // Handle regular objects
+  const result = {} as T;
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      result[key] = deepClone(obj[key]);
+    }
+  }
+  return result;
 }
 
 export function isDeepEqual(a: unknown, b: unknown): boolean {
@@ -423,8 +458,16 @@ export function createStore<
         states = deepClone(states);
 
         if (result instanceof Promise) {
-          // For async actions, return the Promise chain
-          return dispatch(actionKey, payload);
+          // For async actions, handle the promise properly
+          return result.then((finalResult) => {
+            // Send to DevTools after async completion
+            if (devTools && !pauseDevTools) {
+              devTools.send({ type: String(actionKey), payload }, states);
+            }
+
+            notify();
+            return finalResult;
+          });
         }
 
         // Send to DevTools
@@ -457,34 +500,6 @@ export function createStore<
         }
       }
     );
-  }
-
-  // Dedicated async dispatch helper
-  async function dispatch<K extends keyof TActions>(
-    type: K,
-    payload?: PayloadByAction<TActions>[K]
-  ): Promise<ReturnType<TActions[K]>> {
-    const cb = actions[type];
-    if (typeof cb !== 'function')
-      throw new Error(`Action ${String(type)} not found`);
-
-    // Execute the action
-    const result = cb(payload);
-
-    // Create a new reference for the state object so React detects changes
-    states = deepClone(states);
-
-    // We know this is async at this point
-    const finalResult = await result;
-
-    // Send to DevTools
-    if (devTools && !pauseDevTools) {
-      devTools.send({ type: String(type), payload }, states);
-    }
-
-    notify();
-
-    return finalResult as ReturnType<TActions[K]>;
   }
 
   // Reset function
