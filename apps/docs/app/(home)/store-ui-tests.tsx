@@ -62,7 +62,7 @@ const testStore = createStore<
   TestEvents
 >({
   states: initialStates,
-  actions: ({ states, trigger }) => ({
+  actions: ({ states, trigger, notify }) => ({
     increment: () => {
       states.counter += 1;
       trigger('counterChanged', {
@@ -91,6 +91,7 @@ const testStore = createStore<
       const startTime = Date.now();
       states.loading = true;
       states.asyncResult = null;
+      notify();
 
       try {
         // Simulate network delay

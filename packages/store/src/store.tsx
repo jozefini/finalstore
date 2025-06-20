@@ -25,6 +25,7 @@ type ActionsContext<TState, TActions, TSelectors, TEvents> = (store: {
     eventName: TEventName,
     payload: EventPayload<TEvents, TEventName>
   ) => void;
+  notify: () => void;
 }) => TActions;
 type SelectorsContext<TState, TSelectors> = (store: {
   states: TState;
@@ -387,7 +388,11 @@ export function createStore<
         states: statesProxy,
         actions: actionProxy,
         selectors: selectorProxy,
-        trigger
+        trigger,
+        notify: () => {
+          // Force immediate notification for async operations
+          scheduleNotification();
+        }
       })
     : ({} as TActions);
 
