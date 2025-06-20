@@ -8,7 +8,7 @@ export function HeroSection() {
         ⚡ Optimized updates • Type-safe • Lightweight
       </div>
 
-      <h1 className="mb-6 !text-6xl font-bold tracking-tight sm:text-6xl md:text-7xl">
+      <h1 className="mb-6 text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl lg:!text-6xl">
         <span className="from-fd-foreground to-fd-muted-foreground bg-gradient-to-r bg-clip-text text-transparent">
           The better way to
         </span>
