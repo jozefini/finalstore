@@ -1,8 +1,45 @@
+import { Highlight, themes } from 'prism-react-renderer';
+
 type WindowProps = {
   title?: string;
   children: React.ReactNode;
   className?: string;
 };
+
+export function WindowWithCode({
+  title,
+  code = '',
+  className = 'max-w-3xl mx-auto'
+}: Omit<WindowProps, 'children'> & { code?: string }) {
+  const trimmedCode = code.trim();
+
+  return (
+    <Window title={title} className={className}>
+      <div className="from-fd-background/50 overflow-auto bg-gradient-to-b to-white">
+        <Highlight theme={themes.github} code={trimmedCode} language="tsx">
+          {({ style, tokens, getLineProps, getTokenProps }) => (
+            <pre
+              className="min-h-full w-full p-4 text-left text-sm"
+              style={{
+                ...style,
+                background: 'transparent',
+                margin: 0
+              }}
+            >
+              {tokens.map((line, i) => (
+                <div key={i} {...getLineProps({ line })}>
+                  {line.map((token, key) => (
+                    <span key={key} {...getTokenProps({ token })} />
+                  ))}
+                </div>
+              ))}
+            </pre>
+          )}
+        </Highlight>
+      </div>
+    </Window>
+  );
+}
 
 export function Window({ title, children, className = '' }: WindowProps) {
   return (

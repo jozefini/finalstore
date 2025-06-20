@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { Github } from 'lucide-react';
 
+import { HeroSection } from './components/ui/hero-section';
 import {
   AsyncTest,
   BasicStoreTest,
@@ -12,34 +12,7 @@ import { ThreeWaySection } from './components/ui/three-way-section';
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-4 py-20">
-      <div className="mx-auto max-w-[750px] space-y-4 text-center">
-        <h1 className="text-6xl font-bold tracking-tight">
-          Type-safe state management for React
-        </h1>
-        <p className="text-fd-muted-foreground mt-4 text-xl">
-          Simple yet powerful state management with first-class TypeScript
-          support. Zero configuration, built-in DevTools, and collection
-          management.
-        </p>
-
-        <div className="mt-8 flex justify-center gap-4">
-          <Link
-            href="/docs"
-            className="bg-fd-primary text-fd-primary-foreground rounded-md px-5 py-2.5 font-medium transition hover:opacity-90"
-          >
-            Get Started
-          </Link>
-          <a
-            href="https://github.com/jozefini/finalstore"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="border-fd-border hover:bg-fd-accent inline-flex items-center gap-x-1.5 rounded-md border px-5 py-2.5 font-medium transition"
-          >
-            <Github className="-ms-1 size-4" />
-            GitHub
-          </a>
-        </div>
-      </div>
+      <HeroSection />
 
       <ThreeWaySection />
 
