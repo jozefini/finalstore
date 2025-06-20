@@ -1,4 +1,209 @@
+'use client';
+
+import { createStore } from '../../../../../../packages/store/src/store';
+import { Button } from './button';
 import { WindowWithCode } from './window';
+
+// Fake user data
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+};
+
+type UserStates = {
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+};
+
+type UserActions = {
+  fetchUser: (id: string) => Promise<User>;
+  clearUser: () => void;
+};
+
+const initialUserState: UserStates = {
+  user: null,
+  loading: false,
+  error: null
+};
+
+// Fake users database
+const fakeUsers: User[] = [
+  { id: '1', name: 'Alice Johnson', email: 'alice@example.com', avatar: 'AJ' },
+  { id: '2', name: 'Bob Smith', email: 'bob@example.com', avatar: 'BS' },
+  { id: '3', name: 'Carol Davis', email: 'carol@example.com', avatar: 'CD' }
+];
+
+// Fake API function
+const fetchUserById = async (id: string): Promise<User> => {
+  // Simulate network delay
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  const user = fakeUsers.find((u) => u.id === id);
+  if (!user) {
+    throw new Error(`User with id ${id} not found`);
+  }
+
+  // Simulate occasional errors
+  if (Math.random() < 0.2) {
+    throw new Error('Network error occurred');
+  }
+
+  return user;
+};
+
+const userStore = createStore<UserStates, UserActions>({
+  states: initialUserState,
+  actions: ({ states, notify }) => ({
+    async fetchUser(id: string) {
+      // Set loading state immediately
+      states.loading = true;
+      states.error = null;
+      states.user = null;
+      notify();
+
+      try {
+        states.user = await fetchUserById(id);
+        states.loading = false;
+        return states.user;
+      } catch (error) {
+        states.error = (error as Error).message;
+        states.loading = false;
+        throw error;
+      }
+    },
+    clearUser() {
+      states.user = null;
+      states.error = null;
+      states.loading = false;
+    }
+  }),
+  config: {
+    name: 'userStore',
+    devtools: true
+  }
+});
+
+function AsyncDemo() {
+  // const loading = userStore.use((state) => state.loading);
+  // const error = userStore.use((state) => state.error);
+  // const user = userStore.use((state) => state.user);
+  const { user, loading, error } = userStore.use();
+  const handleFetchUser = async (id: string) => {
+    try {
+      await userStore.dispatch.fetchUser(id);
+    } catch (err) {
+      // Error is handled in the store
+    }
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* User Selection */}
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-gray-700">Fetch User</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {fakeUsers.map((fakeUser) => (
+            <Button
+              key={fakeUser.id}
+              size="sm"
+              className="flex h-auto flex-col items-center space-y-1 px-3 py-2 text-xs"
+              onClick={() => handleFetchUser(fakeUser.id)}
+              disabled={loading}
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-purple-600">
+                <span className="text-xs font-bold text-white">
+                  {fakeUser.avatar}
+                </span>
+              </div>
+              <span>{fakeUser.name.split(' ')[0]}</span>
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* User Display */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">Current User</h3>
+          {user && !loading && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-6 px-2 py-1 text-xs"
+              onClick={() => userStore.dispatch.clearUser()}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+
+        <div className="flex h-32 items-center justify-center rounded-lg border border-gray-200 bg-white">
+          {loading ? (
+            <div className="flex flex-col items-center space-y-2">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+              <span className="text-xs text-gray-500">Loading user...</span>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center space-y-2 px-4 text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <span className="text-xs text-red-600">✕</span>
+              </div>
+              <span className="text-xs text-red-600">{error}</span>
+            </div>
+          ) : user ? (
+            <div className="flex items-center space-x-3 p-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-green-600">
+                <span className="text-lg font-bold text-white">
+                  {user.avatar}
+                </span>
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {user.name}
+                </div>
+                <div className="text-xs text-gray-500">{user.email}</div>
+              </div>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">No user selected</span>
+          )}
+        </div>
+      </div>
+
+      {/* Status Indicator */}
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-gray-700">Status</h3>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div className="flex items-center space-x-2">
+            <div
+              className={`h-2 w-2 rounded-full ${
+                loading
+                  ? 'animate-pulse bg-yellow-500'
+                  : error
+                    ? 'bg-red-500'
+                    : user
+                      ? 'bg-green-500'
+                      : 'bg-gray-400'
+              }`}
+            ></div>
+            <span className="font-mono text-xs text-gray-700">
+              {loading
+                ? 'Loading...'
+                : error
+                  ? 'Error occurred'
+                  : user
+                    ? 'User loaded'
+                    : 'Ready'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const codeExample = `
 import { createStore } from 'finalstore'
@@ -95,7 +300,7 @@ export function AsyncSection() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M15 17h5l-5 5v-5zM9 13h6m-3-3v6m5 1V4a1 1 0 00-1-1H5a1 1 0 00-1 1v16a1 1 0 001 1h4"
+                      d="M15 17h5l-5 5v-5zM9 13h6m-3-3v6m5 1V4a1 1 0 00-1-1H5a1 1 0 001 1h4"
                     />
                   </svg>
                 </div>
@@ -139,7 +344,13 @@ export function AsyncSection() {
 
           {/* Right side - Window (75% width on desktop) */}
           <div className="lg:w-3/4">
-            <WindowWithCode title="" code={codeExample} className="w-full" />
+            <WindowWithCode
+              title="Interactive Async Demo"
+              code={codeExample}
+              className="w-full"
+            >
+              <AsyncDemo />
+            </WindowWithCode>
           </div>
         </div>
       </div>

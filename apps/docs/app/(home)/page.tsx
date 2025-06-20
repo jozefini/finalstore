@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { AsyncSection } from './components/ui/async-section';
 import { EventSystemSection } from './components/ui/event-system-section';
 import { HeroSection } from './components/ui/hero-section';
+import { AsyncTest } from './components/ui/store-test';
 // import {
 //   AsyncTest,
 //   BasicStoreTest,
@@ -20,12 +21,12 @@ export default function HomePage() {
       <AsyncSection />
       <EventSystemSection />
 
+      <AsyncTest />
       {/* <div className="mx-auto mt-20 grid w-full max-w-2xl gap-y-10">
         <BasicStoreTest />
         <BatchingTest />
-        <AsyncTest />
         <PerformanceTest />
-      </div>
+        </div>
 
       <div className="mx-auto mt-20 grid w-full max-w-[900px] grid-cols-1 gap-6 px-4 md:grid-cols-3">
         <div className="border-fd-border rounded-lg border p-6">

@@ -329,7 +329,7 @@ export function createStore<
                 const newState = JSON.parse(message.state || '{}');
                 pauseDevTools = true;
                 states = newState;
-                notify();
+                notifySubscribers();
                 pauseDevTools = false;
               } catch (error) {
                 // eslint-disable-next-line no-console
@@ -390,7 +390,11 @@ export function createStore<
         trigger,
         notify: () => {
           // Force immediate notification for async operations
-          scheduleNotification();
+          // Clone state to ensure reference changes are detected
+          states = deepClone(states);
+          stateVersion++;
+          // Call notifySubscribers directly for immediate updates
+          notifySubscribers();
         }
       })
     : ({} as TActions);
@@ -450,9 +454,16 @@ export function createStore<
   ) {
     const id = nextSubscriberId++;
     const initialSelector = selector || ((s: TState) => s);
-    // Memoize the selector for better performance
-    const memoizedSelector = memoizeSelector(initialSelector);
-    const initialValue = memoizedSelector(getState());
+
+    // Only memoize selectors that actually transform the state
+    // For entire store subscriptions (no selector), don't memoize to avoid cache issues
+    const shouldMemoize = selector !== undefined;
+    const memoizedSelector = shouldMemoize
+      ? memoizeSelector(initialSelector)
+      : undefined;
+    const initialValue = memoizedSelector
+      ? memoizedSelector(getState())
+      : initialSelector(getState());
 
     subscriberMap.set(id, {
       selector: initialSelector,
@@ -471,13 +482,13 @@ export function createStore<
     if (!microtaskScheduled) {
       microtaskScheduled = true;
       queueMicrotask(() => {
-        notify();
+        notifySubscribers();
         microtaskScheduled = false;
       });
     }
   }
 
-  function notify() {
+  function notifySubscribers() {
     const currentState = getState();
 
     // Use for-of loop directly on Map.values() for better performance
@@ -485,11 +496,21 @@ export function createStore<
       const selector = sub.memoizedSelector || sub.selector;
       const newValue = selector(currentState);
 
-      if (!isDeepEqual(newValue, sub.lastValue)) {
+      // For entire store subscriptions (no memoized selector), use reference equality
+      // For specific selectors, use deep equality
+      const hasChanged = sub.memoizedSelector
+        ? !isDeepEqual(newValue, sub.lastValue)
+        : newValue !== sub.lastValue;
+
+      if (hasChanged) {
         sub.lastValue = newValue;
         sub.callback();
       }
     }
+  }
+
+  function notify() {
+    notifySubscribers();
   }
 
   // Optimized DevTools with deferred sending
@@ -539,20 +560,34 @@ export function createStore<
 
         if (result instanceof Promise) {
           // For async actions, handle the promise properly
-          return result.then((finalResult) => {
-            // For async actions, always clone since they complete outside batch
-            if (isBatching()) {
+          return result
+            .then((finalResult) => {
+              // For async actions, always clone and notify since they complete outside the original action context
               states = deepClone(states);
               stateVersion++;
-            }
 
-            // Use optimized DevTools scheduling
-            scheduleDevTools(actionInfo);
+              // Use optimized DevTools scheduling
+              scheduleDevTools(actionInfo);
 
-            // Use microtask scheduling for better performance
-            scheduleNotification();
-            return finalResult;
-          });
+              // Always notify after async completion
+              scheduleNotification();
+              return finalResult;
+            })
+            .catch((error) => {
+              // Also handle errors - clone state and notify
+              states = deepClone(states);
+              stateVersion++;
+
+              // Use optimized DevTools scheduling
+              scheduleDevTools({
+                type: `${actionInfo.type}_ERROR`,
+                payload: { ...actionInfo.payload, error: error.message }
+              });
+
+              // Always notify after async error
+              scheduleNotification();
+              throw error;
+            });
         }
 
         // Handle DevTools for batched vs non-batched actions
@@ -601,7 +636,7 @@ export function createStore<
         }
 
         // Always notify after batch
-        notify();
+        notifySubscribers();
       }
     );
   }
@@ -620,7 +655,7 @@ export function createStore<
     }
 
     if (!isDeepEqual(prevStates, states)) {
-      notify();
+      notifySubscribers();
     }
   }
 
