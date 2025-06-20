@@ -1,4 +1,218 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+
+import { createStore } from '../../../../../../packages/store/src/store';
+import { Button } from './button';
 import { WindowWithCode } from './window';
+
+// Interactive cart example
+type CartItem = {
+  id: string;
+  name: string;
+  price: number;
+};
+
+type CartStates = {
+  cart: CartItem[];
+};
+
+type CartActions = {
+  addToCart: (item: CartItem) => void;
+  clearCart: () => void;
+};
+
+type CartEvents = {
+  'cart.items.added': CartItem;
+  'cart.cleared': void;
+};
+
+const initialCartState: CartStates = {
+  cart: []
+};
+
+const cartStore = createStore<
+  CartStates,
+  CartActions,
+  Record<string, never>,
+  CartEvents
+>({
+  states: initialCartState,
+  actions: ({ states, trigger }) => ({
+    addToCart(item: CartItem) {
+      const foundItem = states.cart.find((i) => i.id === item.id);
+      if (!foundItem) {
+        states.cart = [...states.cart, item];
+        trigger('cart.items.added', item);
+      }
+    },
+    clearCart() {
+      states.cart = [];
+      trigger('cart.cleared', undefined);
+    }
+  })
+});
+
+const availableItems: CartItem[] = [
+  { id: '1', name: 'Coffee Mug', price: 12.99 },
+  { id: '2', name: 'Laptop Sticker', price: 4.99 },
+  { id: '3', name: 'T-Shirt', price: 24.99 }
+];
+
+function CartDemo() {
+  const cart = cartStore.use((state) => state.cart);
+  const [events, setEvents] = useState<string[]>([]);
+  const eventLogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Listen to cart events
+    const addedListener = cartStore.on('cart.items.added', (item: CartItem) => {
+      setEvents((prev) => [
+        ...prev,
+        `🛒 Added "${item.name}" to cart ($${item.price})`
+      ]);
+
+      // Auto-scroll to bottom
+      setTimeout(() => {
+        if (eventLogRef.current) {
+          eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight;
+        }
+      }, 0);
+    });
+
+    const clearedListener = cartStore.on('cart.cleared', () => {
+      setEvents((prev) => [...prev, '🗑️ Cart cleared']);
+
+      // Auto-scroll to bottom
+      setTimeout(() => {
+        if (eventLogRef.current) {
+          eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight;
+        }
+      }, 0);
+    });
+
+    return () => {
+      addedListener.off();
+      clearedListener.off();
+      cartStore.reset();
+    };
+  }, []);
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* Available Items */}
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-gray-700">
+          Store Items
+        </h3>
+        <div className="grid grid-cols-3 gap-2">
+          {availableItems.map((item) => (
+            <div
+              key={item.id}
+              className="group relative overflow-hidden rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-gray-300 hover:shadow-md"
+            >
+              <div className="flex flex-col items-center space-y-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600">
+                  <span className="text-xs font-bold text-white">
+                    {item.name.charAt(0)}
+                  </span>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs font-medium text-gray-900">
+                    {item.name}
+                  </div>
+                  <div className="text-xs text-gray-500">${item.price}</div>
+                </div>
+                <Button
+                  size="sm"
+                  className="h-6 px-3 py-1 text-xs"
+                  onClick={() => cartStore.dispatch.addToCart(item)}
+                  disabled={cart.some((cartItem) => cartItem.id === item.id)}
+                >
+                  {cart.some((cartItem) => cartItem.id === item.id)
+                    ? 'Added'
+                    : 'Add'}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Cart */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Cart ({cart.length})
+          </h3>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={cart.length === 0}
+            className="h-6 px-2 py-1 text-xs"
+            onClick={() => cartStore.dispatch.clearCart()}
+          >
+            Clear
+          </Button>
+        </div>
+
+        <div className="h-32 rounded-lg border border-gray-200 bg-white">
+          {cart.length === 0 ? (
+            <div className="py-6 text-center text-xs text-gray-400">
+              Your cart is empty
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {cart.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between px-3 py-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-green-600">
+                      <span className="text-xs font-bold text-white">
+                        {item.name.charAt(0)}
+                      </span>
+                    </div>
+                    <span className="text-xs font-medium text-gray-900">
+                      {item.name}
+                    </span>
+                  </div>
+                  <span className="text-xs font-semibold text-gray-700">
+                    ${item.price}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Event Log */}
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-gray-700">Event Log</h3>
+        <div
+          ref={eventLogRef}
+          className="h-32 overflow-y-auto rounded-lg border border-gray-800 bg-gray-900 p-3"
+        >
+          {events.length === 0 ? (
+            <div className="text-xs text-gray-500">
+              No events yet... try adding items to cart!
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {events.map((event, index) => (
+                <div key={index} className="font-mono text-xs text-green-400">
+                  {event}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const codeExample = `
 import { createStore } from 'finalstore'
@@ -151,7 +365,9 @@ export function EventSystemSection() {
 
           {/* Right side - Window (75% width on desktop) */}
           <div className="lg:w-3/4">
-            <WindowWithCode title="" code={codeExample} className="w-full" />
+            <WindowWithCode code={codeExample} className="w-full">
+              <CartDemo />
+            </WindowWithCode>
           </div>
         </div>
       </div>

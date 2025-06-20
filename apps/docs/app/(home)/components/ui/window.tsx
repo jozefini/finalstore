@@ -15,7 +15,10 @@ export function WindowWithCode({
   code = '',
   children,
   className = 'max-w-3xl mx-auto'
-}: WindowProps & { code?: string }) {
+}: Omit<WindowProps, 'children'> & {
+  code?: string;
+  children?: React.ReactNode;
+}) {
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('code');
   const trimmedCode = code.trim();
 
