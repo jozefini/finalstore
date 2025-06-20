@@ -319,11 +319,9 @@ function PerformanceTests() {
       testStore.dispatch.updateNestedValue('Batch Value');
     });
 
-    setTimeout(() => {
-      const duration = performance.now() - start;
-      const rendersAfter = renderCount;
-      addResult('Batched (4 ops)', duration, rendersAfter - rendersBefore);
-    }, 10);
+    const duration = performance.now() - start;
+    const rendersAfter = renderCount;
+    addResult('Batched (4 ops)', duration, rendersAfter - rendersBefore);
   };
 
   const testSeparateOps = () => {
@@ -335,11 +333,9 @@ function PerformanceTests() {
     testStore.dispatch.addItem('Separate Item');
     testStore.dispatch.updateNestedValue('Separate Value');
 
-    setTimeout(() => {
-      const duration = performance.now() - start;
-      const rendersAfter = renderCount;
-      addResult('Separate (4 ops)', duration, rendersAfter - rendersBefore);
-    }, 50);
+    const duration = performance.now() - start;
+    const rendersAfter = renderCount;
+    addResult('Separate (4 ops)', duration, rendersAfter - rendersBefore);
   };
 
   // Stress Test
@@ -348,30 +344,29 @@ function PerformanceTests() {
     const rendersBefore = renderCount;
 
     testStore.batch(() => {
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 1000; i++) {
         testStore.dispatch.increment();
       }
     });
 
-    setTimeout(() => {
-      const duration = performance.now() - start;
-      const rendersAfter = renderCount;
-      addResult('Batched 100x', duration, rendersAfter - rendersBefore);
-    }, 10);
+    const duration = performance.now() - start;
+    const rendersAfter = renderCount;
+    addResult('Batched 1000x', duration, rendersAfter - rendersBefore);
   };
 
   const testSeparateStress = () => {
     const start = performance.now();
     const rendersBefore = renderCount;
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 1000; i++) {
       testStore.dispatch.increment();
     }
 
+    const duration = performance.now() - start;
+    const rendersAfter = renderCount;
+
     setTimeout(() => {
-      const duration = performance.now() - start;
-      const rendersAfter = renderCount;
-      addResult('Separate 100x', duration, rendersAfter - rendersBefore);
+      addResult('Separate 1000x', duration, rendersAfter - rendersBefore);
     }, 200);
   };
 
@@ -431,13 +426,13 @@ function PerformanceTests() {
               onClick={testBatchedStress}
               className="flex-1 rounded bg-green-500 px-2 py-1 text-xs text-white hover:bg-green-600"
             >
-              ⚡ Batch 100x
+              ⚡ Batch 1000x
             </button>
             <button
               onClick={testSeparateStress}
               className="flex-1 rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
             >
-              🔥 Separate 100x
+              🔥 Separate 1000x
             </button>
           </div>
         </div>
