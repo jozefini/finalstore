@@ -1,409 +1,346 @@
 # Store Documentation
 
-A lightweight, flexible React state management library with TypeScript support, devtools integration, and advanced features like batching, events, and scoped stores.
+React state management with direct mutations, TypeScript-first design, and zero boilerplate.
 
-## Features
+## Core Pattern
 
-- 🚀 **Lightweight** - Minimal bundle size with maximum functionality
-- 🎯 **TypeScript First** - Full type safety with excellent DX
-- 🔄 **Reactive** - Automatic re-renders with optimized subscriptions
-- 🛠️ **DevTools** - Redux DevTools integration
-- 📦 **Batching** - Batch multiple updates for performance
-- 🎪 **Events** - Built-in event system for side effects
-- 🏗️ **Scoped** - Context-based scoped stores
-- 🧠 **Memoized** - Intelligent memoization and caching
-
-## Installation
-
-```bash
-npm install finalstore
-# or
-pnpm add finalstore
-```
-
-## Quick Start
+Always use explicit types. Define initial state as typed constants.
 
 ```tsx
-import { createStore } from 'finalstore';
-
-// Define initial state with explicit types
+// ✅ Required Pattern
 const initialStates = {
   count: 0 as number,
-  name: 'Counter' as string
+  name: '' as string,
+  items: [] as Item[]
 };
 
-// Define types
 type States = typeof initialStates;
-
 type Actions = {
   increment: () => void;
-  decrement: () => void;
   setName: (name: string) => void;
-  reset: () => void;
 };
 
-// Define your store with explicit types
-const counterStore = createStore<States, Actions>({
+const store = createStore<States, Actions>({
   states: initialStates,
   actions: ({ states }) => ({
     increment: () => {
       states.count += 1;
     },
-    decrement: () => {
-      states.count -= 1;
-    },
     setName: (name: string) => {
       states.name = name;
+    }
+  })
+});
+```
+
+## States
+
+State is the single source of truth. Always define with explicit types.
+
+```tsx
+// ✅ Correct - explicit types
+const initialStates = {
+  user: null as User | null,
+  loading: false as boolean,
+  items: [] as Item[]
+};
+
+// ❌ Avoid - inferred types
+const initialStates = {
+  user: null,  // TypeScript can't infer User type
+  loading: false,
+  items: []
+};
+```
+
+**Rules:**
+
+- Use `as Type` for explicit typing
+- Store uses `deepClone` internally - safe to reference `initialStates` in actions
+- Primitive values, objects, arrays, Maps, Sets all supported
+
+## Actions
+
+Direct state mutations. Support sync and async operations.
+
+```tsx
+type Actions = {
+  // Sync action
+  increment: () => void;
+
+  // Async action
+  fetchUser: (id: string) => Promise<User>;
+
+  // Action with parameters
+  updateItem: (id: string, data: Partial<Item>) => void;
+};
+
+const store = createStore<States, Actions>({
+  states: initialStates,
+  actions: ({ states, notify, trigger }) => ({
+    increment: () => {
+      states.count += 1;
     },
-    reset: () => {
-      // Safe to use initialStates since store uses deepClone internally
-      states.count = initialStates.count;
-      states.name = initialStates.name;
+
+    async fetchUser(id: string) {
+      states.loading = true;
+      notify(); // Immediate UI update for loading state
+
+      states.user = await getUserById(id);
+      states.loading = false;
+
+      return states.user;
+    },
+
+    updateItem: (id: string, data: Partial<Item>) => {
+      const item = states.items.find((i) => i.id === id);
+      if (item) Object.assign(item, data);
+    }
+  })
+});
+```
+
+**Rules:**
+
+- Mutate `states` directly - no returns needed
+- Async actions return promises
+- Call `notify()` for immediate UI updates in async actions
+- Use `trigger()` for events
+- Actions auto-notify subscribers when complete
+
+## Selectors
+
+Computed values with automatic memoization.
+
+```tsx
+type Selectors = {
+  completedTodos: () => Todo[];
+  getTodoById: (id: string) => Todo | undefined;
+  stats: () => { total: number; completed: number };
+};
+
+const store = createStore<States, {}, Selectors>({
+  states: initialStates,
+  selectors: ({ states }) => ({
+    completedTodos: () => states.todos.filter((t) => t.completed),
+
+    getTodoById: (id: string) => states.todos.find((t) => t.id === id),
+
+    stats: () => ({
+      total: states.todos.length,
+      completed: states.todos.filter((t) => t.completed).length
+    })
+  })
+});
+```
+
+**Usage:**
+
+```tsx
+// In components
+const completed = store.use.completedTodos();
+const todo = store.use.getTodoById('123');
+
+// Non-reactive access
+const stats = store.get.stats();
+```
+
+## Events
+
+Side effects and pub/sub system.
+
+```tsx
+type Events = {
+  userLoggedIn: User;
+  error: Error;
+  dataChanged: { type: string; data: any };
+};
+
+const store = createStore<States, Actions, {}, Events>({
+  states: initialStates,
+  actions: ({ states, trigger }) => ({
+    login: async (credentials) => {
+      const user = await authenticate(credentials);
+      states.user = user;
+      trigger('userLoggedIn', user);
     }
   })
 });
 
-// Use in React component
-function Counter() {
-  const count = counterStore.use((state) => state.count);
-  const { increment, decrement, reset } = counterStore.dispatch;
+// Listen to events
+store.on('analytics', 'userLoggedIn', (user) => {
+  track('User Login', { userId: user.id });
+});
 
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={increment}>+</button>
-      <button onClick={decrement}>-</button>
-      <button onClick={reset}>Reset</button>
-    </div>
-  );
-}
+// Remove listener
+store.off('analytics');
 ```
 
-## API Reference
+## Reactive Access - `use()`
 
-### `createStore(props)`
-
-Creates a new store instance.
-
-#### Parameters
-
-```typescript
-interface StoreProps<TState, TActions, TSelectors, TEvents> {
-  states: TState;
-  actions?: ActionsContext<TState, TActions, TSelectors, TEvents>;
-  selectors?: SelectorsContext<TState, TSelectors>;
-  config?: {
-    name?: string;
-    devtools?: boolean;
-  };
-}
-```
-
-#### Returns
-
-```typescript
-interface InferStore<TState, TActions, TSelectors, TEvents> {
-  dispatch: TActions;
-  use: UseFunction & TSelectors;
-  get: GetFunction & TSelectors;
-  reset: () => void;
-  batch: (callback: () => void) => void;
-  on: (id: string, eventName: keyof TEvents, callback: Function) => void;
-  off: (id: string) => void;
-}
-```
-
-### Store Methods
-
-#### `store.use(selector?)`
-
-Hook for subscribing to state changes in React components.
+Subscribe to state changes in React components.
 
 ```tsx
-// Get entire state
-const state = store.use();
+function Component() {
+  // Get entire state
+  const state = store.use();
 
-// Get specific slice
-const count = store.use(state => state.count);
+  // Get specific value
+  const count = store.use(state => state.count);
 
-// Get multiple values
-const { count, name } = store.use(state => ({
-  count: state.count,
-  name: state.name
-}));
+  // Get multiple values
+  const { count, name } = store.use(state => ({
+    count: state.count,
+    name: state.name
+  }));
+
+  // Use selectors
+  const completed = store.use.completedTodos();
+}
 ```
 
-#### `store.get(selector?)`
+**Rules:**
 
-Get state synchronously without subscribing.
+- Only use in React components
+- Automatically subscribes and unsubscribes
+- Triggers re-renders when selected state changes
+- Selectors are memoized automatically
+
+## Non-Reactive Access - `get()`
+
+Get current state without subscribing.
 
 ```tsx
 // Get entire state
 const state = store.get();
 
-// Get specific slice
+// Get specific value
 const count = store.get((state) => state.count);
-```
-
-#### `store.dispatch`
-
-Object containing all your actions.
-
-```tsx
-// Call actions
-store.dispatch.increment();
-store.dispatch.setName('New Name');
-
-// Actions can be async
-store.dispatch.fetchData().then((result) => {
-  console.log('Data loaded:', result);
-});
-```
-
-#### `store.reset()`
-
-Reset store to initial state.
-
-```tsx
-store.reset();
-```
-
-#### `store.batch(callback)`
-
-Batch multiple updates into a single re-render.
-
-```tsx
-store.batch(() => {
-  store.dispatch.increment();
-  store.dispatch.increment();
-  store.dispatch.setName('Batched');
-});
-// Only triggers one re-render
-```
-
-#### `store.on(id, eventName, callback)` / `store.off(id)`
-
-Event system for side effects.
-
-```tsx
-// Listen to events
-store.on('my-listener', 'userLoggedIn', (user) => {
-  console.log('User logged in:', user);
-});
-
-// Remove listener
-store.off('my-listener');
-```
-
-## Advanced Usage
-
-### Actions with Complex Logic
-
-```tsx
-// Define initial state with explicit types
-const initialTodoStates = {
-  todos: [] as Todo[],
-  filter: 'all' as 'all' | 'active' | 'completed',
-  loading: false as boolean
-};
-
-type TodoStates = typeof initialTodoStates;
-
-type TodoActions = {
-  addTodo: (text: string) => Promise<void>;
-  toggleTodo: (id: string) => void;
-  setFilter: (filter: 'all' | 'active' | 'completed') => void;
-  reset: () => void;
-};
-
-type TodoEvents = {
-  todoAdded: Todo;
-  error: Error;
-};
-
-const todoStore = createStore<TodoStates, TodoActions, {}, TodoEvents>({
-  states: initialTodoStates,
-  actions: ({ states, trigger }) => ({
-    async addTodo(text: string) {
-      states.loading = true;
-
-      try {
-        const response = await fetch('/api/todos', {
-          method: 'POST',
-          body: JSON.stringify({ text }),
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-        const todo = await response.json();
-        states.todos.push(todo);
-
-        // Trigger event for side effects
-        trigger('todoAdded', todo);
-      } catch (error) {
-        trigger('error', error as Error);
-      } finally {
-        states.loading = false;
-      }
-    },
-
-    toggleTodo(id: string) {
-      const todo = states.todos.find((t) => t.id === id);
-      if (todo) {
-        todo.completed = !todo.completed;
-      }
-    },
-
-    setFilter(filter: 'all' | 'active' | 'completed') {
-      states.filter = filter;
-    },
-
-    reset() {
-      // Safe to use initialTodoStates since store uses deepClone internally
-      states.todos = [...initialTodoStates.todos];
-      states.filter = initialTodoStates.filter;
-      states.loading = initialTodoStates.loading;
-    }
-  })
-});
-```
-
-### Selectors for Computed Values
-
-```tsx
-// Define initial state with explicit types
-const initialTodoStates = {
-  todos: [] as Todo[],
-  filter: 'all' as 'all' | 'active' | 'completed'
-};
-
-type TodoStates = typeof initialTodoStates;
-
-type TodoSelectors = {
-  filteredTodos: () => Todo[];
-  todoStats: () => { total: number; active: number; completed: number };
-  getTodoById: (id: string) => Todo | undefined;
-};
-
-const todoStore = createStore<TodoStates, {}, TodoSelectors>({
-  states: initialTodoStates,
-  selectors: ({ states }) => ({
-    filteredTodos: () => {
-      switch (states.filter) {
-        case 'active':
-          return states.todos.filter((todo) => !todo.completed);
-        case 'completed':
-          return states.todos.filter((todo) => todo.completed);
-        default:
-          return states.todos;
-      }
-    },
-
-    todoStats: () => ({
-      total: states.todos.length,
-      active: states.todos.filter((t) => !t.completed).length,
-      completed: states.todos.filter((t) => t.completed).length
-    }),
-
-    getTodoById: (id: string) => {
-      return states.todos.find((todo) => todo.id === id);
-    }
-  })
-});
 
 // Use selectors
-function TodoList() {
-  const filteredTodos = todoStore.use.filteredTodos();
-  const stats = todoStore.use.todoStats();
+const stats = store.get.stats();
+
+// In event handlers, utils, etc.
+button.onclick = () => {
+  const currentCount = store.get((state) => state.count);
+  console.log(currentCount);
+};
+```
+
+## Dispatching Actions
+
+Call actions through the dispatch object.
+
+```tsx
+// Sync actions
+store.dispatch.increment();
+store.dispatch.setName('John');
+
+// Async actions
+const user = await store.dispatch.fetchUser('123');
+
+// In components
+function Counter() {
+  const count = store.use((state) => state.count);
+  const { increment, decrement } = store.dispatch;
 
   return (
     <div>
-      <p>
-        Total: {stats.total}, Active: {stats.active}
-      </p>
-      {filteredTodos.map((todo) => (
-        <TodoItem key={todo.id} todo={todo} />
-      ))}
+      <span>{count}</span>
+      <button onClick={increment}>+</button>
+      <button onClick={decrement}>-</button>
     </div>
   );
 }
 ```
 
-### Events and Side Effects
+## Batching
+
+Group multiple updates into single re-render.
 
 ```tsx
-const userStore = createStore({
-  states: {
-    user: null as User | null,
-    notifications: [] as Notification[]
-  },
-  actions: ({ states, trigger }) => ({
-    login: async (credentials: LoginCredentials) => {
-      const user = await authenticate(credentials);
-      states.user = user;
-      trigger('userLoggedIn', user);
-    },
+// Multiple updates = multiple re-renders
+store.dispatch.increment();
+store.dispatch.setName('John');
+store.dispatch.addItem(item);
 
-    logout: () => {
-      states.user = null;
-      trigger('userLoggedOut', {});
-    }
-  })
-});
-
-// Set up side effects
-userStore.on('analytics', 'userLoggedIn', (user) => {
-  analytics.track('User Logged In', { userId: user.id });
-});
-
-userStore.on('notifications', 'userLoggedIn', (user) => {
-  showWelcomeNotification(user.name);
+// Batched = single re-render
+store.batch(() => {
+  store.dispatch.increment();
+  store.dispatch.setName('John');
+  store.dispatch.addItem(item);
 });
 ```
 
-### DevTools Integration
+**Rules:**
+
+- Use for multiple synchronous updates
+- Async actions in batch still trigger individual notifications
+- DevTools shows batched actions as group
+
+## Reset
+
+Restore to initial state.
 
 ```tsx
-const store = createStore({
-  states: { count: 0 },
-  actions: ({ states }) => ({
-    increment: () => (states.count += 1)
-  }),
-  config: {
-    name: 'Counter Store',
-    devtools: true // Enable Redux DevTools
+// Reset entire store
+store.reset();
+
+// Custom reset in actions
+actions: ({ states }) => ({
+  resetForm: () => {
+    // Safe to use initialStates - store uses deepClone
+    states.formData = initialStates.formData;
+    states.errors = initialStates.errors;
   }
 });
 ```
 
-## Scoped Stores
+## DevTools Integration
 
-For component-scoped state, use `createScopedStore`:
+Redux DevTools support for debugging.
 
 ```tsx
-import { createScopedStore } from 'finalstore';
+const store = createStore({
+  states: initialStates,
+  actions: actions,
+  config: {
+    name: 'My Store',
+    devtools: true // Enable in development
+  }
+});
+```
 
+**Features:**
+
+- Time travel debugging
+- Action replay
+- State inspection
+- Jump to action/state
+
+## Scoped Stores
+
+Context-based stores for component scope.
+
+```tsx
 const { Provider, useStore } = createScopedStore({
-  states: {
-    formData: {
-      name: '',
-      email: ''
-    }
-  },
+  states: { formData: { name: '', email: '' } },
   actions: ({ states }) => ({
     updateField: (field: string, value: string) => {
       states.formData[field] = value;
-    },
-    reset: () => {
-      states.formData = { name: '', email: '' };
     }
   })
 });
 
-function FormProvider({ children }) {
-  return <Provider>{children}</Provider>;
+function App() {
+  return (
+    <Provider>
+      <Form />
+    </Provider>
+  );
 }
 
-function FormField() {
+function Form() {
   const store = useStore();
   const formData = store.use((state) => state.formData);
 
@@ -416,200 +353,198 @@ function FormField() {
 }
 ```
 
-## Performance Tips
+## TypeScript Patterns
 
-### Optimize Selectors
+### Explicit Type Declaration
 
-```tsx
-// ✅ Good - specific selector
-const count = store.use(state => state.count);
-
-// ❌ Avoid - selecting entire state when you only need count
-const state = store.use();
-const count = state.count;
-```
-
-### Use Batching for Multiple Updates
+**Always declare types explicitly:**
 
 ```tsx
-// ✅ Good - batched updates
-store.batch(() => {
-  store.dispatch.setName('John');
-  store.dispatch.setAge(25);
-  store.dispatch.setEmail('john@example.com');
+// ✅ Required
+const store = createStore<States, Actions, Selectors, Events>({
+  // implementation
 });
 
-// ❌ Avoid - separate updates trigger multiple renders
-store.dispatch.setName('John');
-store.dispatch.setAge(25);
-store.dispatch.setEmail('john@example.com');
+// ❌ Don't rely on inference
+const store = createStore({
+  // TypeScript can't infer complex types
+});
 ```
-
-### Memoize Complex Selectors
-
-```tsx
-const expensiveSelector = useCallback(
-  (state) =>
-    state.items.filter(
-      (item) => item.category === 'electronics' && item.price > 100
-    ),
-  []
-);
-
-const expensiveItems = store.use(expensiveSelector);
-```
-
-## TypeScript Usage
-
-### Why Explicit Types Matter
-
-**It's very important to declare explicit types on `createStore<States, Actions, Selectors>`** for several reasons:
-
-1. **Full Type Safety** - Get complete IntelliSense and error checking
-2. **Better Refactoring** - TypeScript can help with safe refactoring
-3. **Clear Contracts** - Types serve as documentation for your store's API
-4. **Prevent Runtime Errors** - Catch type mismatches at compile time
 
 ### Initial State Pattern
 
-**Best practice is to define state as a constant with explicit types:**
-
 ```tsx
-// ✅ Recommended Pattern
+// ✅ Best practice
 const initialStates = {
   count: 0 as number,
-  name: '' as string,
+  user: null as User | null,
   items: [] as Item[]
 };
 
 type States = typeof initialStates;
-```
 
-**Why this pattern works:**
-
-- Store uses `deepClone` internally, so it won't reference the original `initialStates`
-- You can safely use `initialStates` in reset actions
-- Clear type definitions from the start
-- Easy to maintain and extend
-
-### Strict Typing
-
-```tsx
-interface AppState {
+// ✅ Alternative
+interface States {
+  count: number;
   user: User | null;
-  todos: Todo[];
-  settings: Settings;
+  items: Item[];
 }
 
-interface AppActions {
-  setUser: (user: User) => void;
-  addTodo: (text: string) => Promise<void>;
-  updateSettings: (settings: Partial<Settings>) => void;
-}
-
-interface AppSelectors {
-  completedTodos: () => Todo[];
-  userDisplayName: () => string;
-}
-
-interface AppEvents {
-  userLoggedIn: User;
-  todoCompleted: Todo;
-  settingsChanged: Settings;
-}
-
-const appStore = createStore<AppState, AppActions, AppSelectors, AppEvents>({
-  states: {
-    user: null,
-    todos: [],
-    settings: defaultSettings
-  }
-  // ... actions, selectors
-});
+const initialStates: States = {
+  count: 0,
+  user: null,
+  items: []
+};
 ```
 
-### Recommended Type Structure
-
-Always use explicit types for better developer experience and type safety:
+### Action Types
 
 ```tsx
-// Define initial state with explicit types
-const initialStates = {
-  count: 0 as number,
-  name: 'test' as string,
-  items: [] as Item[]
-};
-
-type States = typeof initialStates;
-
 type Actions = {
-  increment: () => void;
-  setName: (name: string) => void;
-  addItem: (item: Item) => void;
-  reset: () => void;
+  syncAction: () => void;
+  asyncAction: (param: string) => Promise<Result>;
+  voidAction: (data: Data) => void;
+};
+```
+
+### Selector Types
+
+```tsx
+type Selectors = {
+  computed: () => ComputedValue;
+  filtered: (criteria: FilterCriteria) => Item[];
+  single: (id: string) => Item | undefined;
+};
+```
+
+## Performance Rules
+
+### Selector Optimization
+
+```tsx
+// ✅ Specific selectors
+const count = store.use(state => state.count);
+
+// ❌ Over-selecting
+const state = store.use();
+const count = state.count; // Triggers on any state change
+```
+
+### Batching Guidelines
+
+```tsx
+// ✅ Batch synchronous updates
+store.batch(() => {
+  store.dispatch.updateA();
+  store.dispatch.updateB();
+  store.dispatch.updateC();
+});
+
+// ✅ Don't batch async actions - they handle their own updates
+await store.dispatch.fetchData();
+await store.dispatch.processData();
+```
+
+### Memoization
+
+Selectors are automatically memoized. Complex selectors benefit from React.useMemo:
+
+```tsx
+const expensiveSelector = useMemo(
+  () => (state: State) => expensiveComputation(state.data),
+  []
+);
+
+const result = store.use(expensiveSelector);
+```
+
+## Common Patterns
+
+### Loading States
+
+```tsx
+const initialStates = {
+  data: null as Data | null,
+  loading: false as boolean,
+  error: null as Error | null
 };
 
-const store = createStore<States, Actions>({
-  states: initialStates,
-  actions: ({ states }) => ({
-    increment: () => {
-      states.count += 1;
-    },
-    setName: (name: string) => {
-      states.name = name;
-    },
-    addItem: (item: Item) => {
-      states.items.push(item);
-    },
-    reset: () => {
-      // Safe to use initialStates since store uses deepClone internally
-      states.count = initialStates.count;
-      states.name = initialStates.name;
-      states.items = [...initialStates.items];
+const actions = ({ states, notify }) => ({
+  async fetchData() {
+    states.loading = true;
+    states.error = null;
+    notify(); // Show loading immediately
+
+    try {
+      states.data = await api.getData();
+    } catch (error) {
+      states.error = error as Error;
+    } finally {
+      states.loading = false;
     }
-  })
+  }
 });
 ```
 
-## Migration Guide
+### Form Management
+
+```tsx
+const initialStates = {
+  values: {} as Record<string, any>,
+  errors: {} as Record<string, string>,
+  touched: {} as Record<string, boolean>
+};
+
+const actions = ({ states }) => ({
+  setValue: (field: string, value: any) => {
+    states.values[field] = value;
+    states.touched[field] = true;
+    delete states.errors[field];
+  },
+
+  setError: (field: string, error: string) => {
+    states.errors[field] = error;
+  }
+});
+```
+
+### List Management
+
+```tsx
+const actions = ({ states }) => ({
+  addItem: (item: Item) => {
+    states.items.push(item);
+  },
+
+  updateItem: (id: string, updates: Partial<Item>) => {
+    const item = states.items.find((i) => i.id === id);
+    if (item) Object.assign(item, updates);
+  },
+
+  removeItem: (id: string) => {
+    states.items = states.items.filter((i) => i.id !== id);
+  }
+});
+```
+
+## Migration Patterns
 
 ### From Redux
 
 ```tsx
-// Redux
+// Redux reducer
 const reducer = (state, action) => {
   switch (action.type) {
     case 'INCREMENT':
       return { ...state, count: state.count + 1 };
-    case 'SET_NAME':
-      return { ...state, name: action.payload };
-    default:
-      return state;
   }
 };
 
-// Our Store - Best Practice
-const initialStates = {
-  count: 0 as number,
-  name: '' as string
-};
-
-type States = typeof initialStates;
-type Actions = {
-  increment: () => void;
-  setName: (name: string) => void;
-};
-
-const store = createStore<States, Actions>({
-  states: initialStates,
-  actions: ({ states }) => ({
-    increment: () => {
-      states.count += 1;
-    },
-    setName: (name: string) => {
-      states.name = name;
-    }
-  })
+// Store equivalent
+const actions = ({ states }) => ({
+  increment: () => {
+    states.count += 1;
+  }
 });
 ```
 
@@ -622,18 +557,9 @@ const useStore = create((set) => ({
   increment: () => set((state) => ({ count: state.count + 1 }))
 }));
 
-// Our Store - Best Practice
-const initialStates = {
-  count: 0 as number
-};
-
-type States = typeof initialStates;
-type Actions = {
-  increment: () => void;
-};
-
+// Store equivalent
 const store = createStore<States, Actions>({
-  states: initialStates,
+  states: { count: 0 as number },
   actions: ({ states }) => ({
     increment: () => {
       states.count += 1;
@@ -642,33 +568,52 @@ const store = createStore<States, Actions>({
 });
 ```
 
+## Error Handling
+
+### Action Error Handling
+
+```tsx
+const actions = ({ states, trigger }) => ({
+  async fetchData() {
+    try {
+      states.data = await api.getData();
+    } catch (error) {
+      states.error = error as Error;
+      trigger('error', error as Error);
+      throw error; // Re-throw for component handling
+    }
+  }
+});
+
+// In component
+const handleFetch = async () => {
+  try {
+    await store.dispatch.fetchData();
+  } catch (error) {
+    // Handle UI-specific error response
+  }
+};
+```
+
+### Global Error Events
+
+```tsx
+// Listen to all errors
+store.on('errorHandler', 'error', (error) => {
+  console.error('Store error:', error);
+  // Send to error reporting service
+});
+```
+
 ## Best Practices
 
-1. **Always declare explicit types** - Use `createStore<States, Actions, Selectors>()` for full type safety
-2. **Define initial state as constant** - Create typed initial state constants for better maintainability
-3. **Use initial state in reset actions** - Safe to reference since store uses `deepClone` internally
-4. **Keep stores focused** - Don't create one giant store for everything
-5. **Use selectors** - Extract computed values into selectors
-6. **Batch updates** - Use batching for multiple synchronous updates
-7. **Handle async properly** - Use async actions for API calls
-8. **Use events for side effects** - Keep actions pure, use events for analytics, notifications, etc.
-9. **Enable devtools** - Great for debugging in development
-10. **Test your stores** - Stores are easy to test since they're just functions
-
-## Examples
-
-Check out more examples in the `/examples` directory:
-
-- [Counter Example](./examples/counter)
-- [Todo App](./examples/todo-app)
-- [Shopping Cart](./examples/shopping-cart)
-- [User Authentication](./examples/auth)
-- [Form Management](./examples/forms)
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
-
-## License
-
-MIT License - see [LICENSE.md](./LICENSE.md) for details.
+1. **Always use explicit types** - `createStore<States, Actions, Selectors>()`
+2. **Define initial state with types** - `count: 0 as number`
+3. **Use initial state in reset** - Safe due to `deepClone`
+4. **Batch multiple updates** - Single re-render
+5. **Use selectors for computed values** - Automatic memoization
+6. **Handle async with notify()** - Immediate loading states
+7. **Use events for side effects** - Keep actions pure
+8. **Enable devtools in development**
+9. **Optimize selectors** - Select only what you need
+10. **Test stores easily** - Just functions and objects
