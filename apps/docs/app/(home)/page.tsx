@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Github } from 'lucide-react';
 
-import { StoreUITests } from '../../../../packages/store/src';
 // import {
 //   MapExample,
 //   MapStressTest,
@@ -14,6 +13,7 @@ import { Counter } from './components/store/counter-text';
 import { TextControl } from './components/store/text-control';
 import { ThemeToggle } from './components/store/theme-toggle';
 import { Window } from './components/ui/window';
+import { StoreUITests } from './store-ui-tests';
 
 export default function HomePage() {
   return (

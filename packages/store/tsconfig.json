@@ -1,5 +1,9 @@
 {
   "extends": "@finalstore/tsconfig/react-library.json",
-  "include": [".", ".eslintrc.js"],
+  "include": [
+    ".",
+    ".eslintrc.js",
+    "../../apps/docs/app/(home)/store-ui-tests.tsx"
+  ],
   "exclude": ["dist", "node_modules"]
 }

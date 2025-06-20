@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { createStore } from './store';
+import { createStore } from '../../../../packages/store/src/store';
 
 // Test Store Setup
 const initialStates = {
@@ -274,7 +274,7 @@ function NonReactiveCounter() {
         <p className="mb-3 text-sm text-gray-700">Requires manual refresh</p>
         <button
           onClick={updateCounter}
-          className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+          className="rounded bg-gray-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700"
         >
           🔄 Manual Update
         </button>
@@ -350,8 +350,6 @@ function SelectorsTest() {
 
 function BatchingTest() {
   const renderCount = useRenderCounter('BatchingTest');
-  const [batchedRenders, setBatchedRenders] = useState(0);
-  const [separateRenders, setSeparateRenders] = useState(0);
 
   // Track state changes
   const counter = testStore.use((state) => state.counter);
@@ -363,13 +361,11 @@ function BatchingTest() {
     testStore.batch(() => {
       testStore.dispatch.batchedOperations();
     });
-    setBatchedRenders((prev) => prev + 1);
     console.log('🔄 Batched operation executed');
   };
 
   const testSeparateOperations = () => {
     testStore.dispatch.multipleSeparateOperations();
-    setSeparateRenders((prev) => prev + 4);
     console.log('🔄 Separate operations executed');
   };
 
@@ -401,16 +397,16 @@ function BatchingTest() {
       </div>
 
       {/* Test Buttons */}
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         <button
           onClick={testBatchedOperations}
-          className="flex-1 rounded-lg bg-green-500 px-4 py-3 font-medium text-white transition-colors hover:bg-green-600"
+          className="flex-1 rounded bg-green-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-600"
         >
           ⚡ Batched Ops
         </button>
         <button
           onClick={testSeparateOperations}
-          className="flex-1 rounded-lg bg-orange-500 px-4 py-3 font-medium text-white transition-colors hover:bg-orange-600"
+          className="flex-1 rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
         >
           🔄 Separate Ops
         </button>
@@ -483,7 +479,7 @@ function AsyncTest() {
       <button
         onClick={handleAsyncOperation}
         disabled={loading}
-        className="w-full rounded-lg bg-yellow-500 px-4 py-3 font-medium text-white transition-colors hover:bg-yellow-600 disabled:cursor-not-allowed disabled:bg-yellow-300"
+        className="w-full rounded bg-yellow-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-yellow-600 disabled:cursor-not-allowed disabled:bg-yellow-300"
       >
         {loading ? '⏳ Loading...' : '🚀 Start Async Operation'}
       </button>
@@ -593,7 +589,7 @@ function EventsTest() {
 
       <button
         onClick={() => setEvents([])}
-        className="w-full rounded-lg bg-indigo-500 px-4 py-2 font-medium text-white transition-colors hover:bg-indigo-600"
+        className="w-full rounded bg-indigo-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
       >
         🗑️ Clear Event Log
       </button>
@@ -631,10 +627,10 @@ function StateInspector() {
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1">
         <button
           onClick={() => setUseReactive(!useReactive)}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+          className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
             useReactive
               ? 'bg-blue-500 text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -646,7 +642,7 @@ function StateInspector() {
           <>
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
                 autoRefresh
                   ? 'bg-green-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -656,7 +652,7 @@ function StateInspector() {
             </button>
             <button
               onClick={() => setNonReactiveState(testStore.get())}
-              className="rounded-lg bg-gray-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-600"
+              className="rounded bg-gray-500 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-600"
             >
               🔄 Refresh
             </button>
@@ -697,16 +693,16 @@ function SubscriptionLeakTest() {
         Tests if components properly clean up subscriptions when unmounted
       </p>
 
-      <div className="mb-2 flex gap-2">
+      <div className="mb-2 flex gap-1">
         <button
           onClick={() => setComponentCount((prev) => prev + 5)}
-          className="rounded bg-orange-600 px-3 py-1 text-sm text-white hover:bg-orange-700"
+          className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
         >
           Add 5 Components
         </button>
         <button
           onClick={() => setShowComponents(!showComponents)}
-          className="rounded bg-orange-600 px-3 py-1 text-sm text-white hover:bg-orange-700"
+          className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
         >
           {showComponents ? 'Hide' : 'Show'} ({componentCount})
         </button>
@@ -715,7 +711,7 @@ function SubscriptionLeakTest() {
             setComponentCount(0);
             setShowComponents(false);
           }}
-          className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700"
+          className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700"
         >
           Clear All
         </button>
@@ -787,22 +783,22 @@ function RerenderComparisonTest() {
         Watch console for detailed render logs
       </p>
 
-      <div className="mb-2 flex gap-2">
+      <div className="mb-2 flex gap-1">
         <button
           onClick={testReactiveRender}
-          className="rounded bg-teal-600 px-3 py-1 text-sm text-white hover:bg-teal-700"
+          className="rounded bg-teal-600 px-2 py-1 text-xs text-white hover:bg-teal-700"
         >
           Single Update
         </button>
         <button
           onClick={testBatchedRender}
-          className="rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
+          className="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700"
         >
           Batched Updates
         </button>
         <button
           onClick={testSeparateRenders}
-          className="rounded bg-orange-600 px-3 py-1 text-sm text-white hover:bg-orange-700"
+          className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
         >
           Separate Updates
         </button>
@@ -883,16 +879,16 @@ function StressTest() {
         Performance comparison of batch vs separate operations
       </p>
 
-      <div className="mb-2 flex gap-2">
+      <div className="mb-2 flex gap-1">
         <button
           onClick={stressTestBatch}
-          className="rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
+          className="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700"
         >
           Batch 1000 Ops
         </button>
         <button
           onClick={stressTestSeparate}
-          className="rounded bg-orange-600 px-3 py-1 text-sm text-white hover:bg-orange-700"
+          className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
         >
           Separate 100 Ops
         </button>
@@ -981,12 +977,12 @@ function PerformanceTest() {
   return (
     <div className="space-y-4">
       {/* Test Buttons */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         {testOperations.map((test, index) => (
           <button
             key={index}
             onClick={() => measureOperation(test.name, test.operation)}
-            className={`${test.color} flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-medium text-white transition-colors`}
+            className={`${test.color} flex items-center justify-center gap-1 rounded px-3 py-2 text-sm font-medium text-white transition-colors`}
           >
             <span>{test.icon}</span>
             {test.name}
@@ -1030,13 +1026,12 @@ function PerformanceTest() {
 
 export function StoreUITests() {
   const renderCount = useRenderCounter('StoreUITests');
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'basic' | 'performance' | 'advanced'
   >('basic');
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 p-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4">
       {/* Header */}
       <div className="text-center">
         <h1 className="mb-4 text-4xl font-bold text-gray-900">
@@ -1054,40 +1049,40 @@ export function StoreUITests() {
       </div>
 
       {/* Quick Actions */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-xl font-semibold text-gray-900">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-lg font-semibold text-gray-900">
           Quick Actions
         </h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => testStore.dispatch.increment()}
-            className="flex items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-600"
+            className="flex items-center gap-1 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-600"
           >
-            <span className="text-lg">+</span>
+            <span>+</span>
             Increment
           </button>
           <button
             onClick={() => testStore.dispatch.decrement()}
-            className="flex items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-600"
+            className="flex items-center gap-1 rounded bg-blue-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-600"
           >
-            <span className="text-lg">-</span>
+            <span>-</span>
             Decrement
           </button>
           <button
             onClick={() => testStore.dispatch.setName(`Name-${Date.now()}`)}
-            className="rounded-lg bg-emerald-500 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-600"
+            className="rounded bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600"
           >
             Change Name
           </button>
           <button
             onClick={() => testStore.dispatch.addItem(`Item-${Date.now()}`)}
-            className="rounded-lg bg-purple-500 px-4 py-3 font-medium text-white transition-colors hover:bg-purple-600"
+            className="rounded bg-purple-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-purple-600"
           >
             Add Item
           </button>
           <button
             onClick={() => testStore.dispatch.toggleTheme()}
-            className="rounded-lg bg-amber-500 px-4 py-3 font-medium text-white transition-colors hover:bg-amber-600"
+            className="rounded bg-amber-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-600"
           >
             Toggle Theme
           </button>
@@ -1095,13 +1090,13 @@ export function StoreUITests() {
             onClick={() =>
               testStore.dispatch.updateNestedValue(`Val-${Date.now()}`)
             }
-            className="rounded-lg bg-indigo-500 px-4 py-3 font-medium text-white transition-colors hover:bg-indigo-600"
+            className="rounded bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
           >
             Update Nested
           </button>
           <button
             onClick={() => testStore.dispatch.reset()}
-            className="rounded-lg bg-red-500 px-4 py-3 font-medium text-white transition-colors hover:bg-red-600"
+            className="rounded bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-600"
           >
             Reset All
           </button>
@@ -1121,7 +1116,7 @@ export function StoreUITests() {
               onClick={() =>
                 setActiveTab(tab.key as 'basic' | 'performance' | 'advanced')
               }
-              className={`flex items-center gap-2 rounded-md px-6 py-3 font-medium transition-all ${
+              className={`flex items-center gap-1 rounded-md px-4 py-2 text-sm font-medium transition-all ${
                 activeTab === tab.key
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
@@ -1136,31 +1131,31 @@ export function StoreUITests() {
 
       {/* Basic Tests Tab */}
       {activeTab === 'basic' && (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Reactivity Comparison */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">
               Reactivity Comparison
             </h2>
-            <p className="mb-6 text-gray-600">
+            <p className="mb-4 text-sm text-gray-600">
               Compare reactive (.use) vs non-reactive (.get) behavior
             </p>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <ReactiveCounter />
               <NonReactiveCounter />
             </div>
           </div>
 
           {/* Selectors & State */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-gray-900">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
                 Selectors
               </h2>
               <SelectorsTest />
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-gray-900">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
                 State Inspector
               </h2>
               <StateInspector />
@@ -1168,15 +1163,15 @@ export function StoreUITests() {
           </div>
 
           {/* Batching & Events */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-gray-900">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
                 Batching
               </h2>
               <BatchingTest />
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-gray-900">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
                 Events
               </h2>
               <EventsTest />
@@ -1184,8 +1179,8 @@ export function StoreUITests() {
           </div>
 
           {/* Async Operations */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">
               Async Operations
             </h2>
             <AsyncTest />
@@ -1195,24 +1190,24 @@ export function StoreUITests() {
 
       {/* Performance Tests Tab */}
       {activeTab === 'performance' && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-gray-900">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
                 Performance Benchmarks
               </h2>
               <PerformanceTest />
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold text-gray-900">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">
                 Stress Testing
               </h2>
               <StressTest />
             </div>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">
               Re-render Analysis
             </h2>
             <RerenderComparisonTest />
@@ -1222,34 +1217,34 @@ export function StoreUITests() {
 
       {/* Advanced Tests Tab */}
       {activeTab === 'advanced' && (
-        <div className="space-y-8">
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+        <div className="space-y-6">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">
               Render Isolation
             </h2>
-            <p className="mb-6 text-gray-600">
+            <p className="mb-4 text-sm text-gray-600">
               These components should only re-render when their specific state
               changes
             </p>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <CounterOnlyComponent />
               <NameOnlyComponent />
               <ItemsOnlyComponent />
             </div>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">
               Batch vs Separate Comparison
             </h2>
             <BatchComparisonTest />
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">
               Subscription Management
             </h2>
-            <p className="mb-6 text-gray-600">
+            <p className="mb-4 text-sm text-gray-600">
               Tests for memory leaks and proper cleanup
             </p>
             <SubscriptionLeakTest />
