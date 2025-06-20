@@ -394,8 +394,8 @@ describe('Store Core Functionality', () => {
       );
 
       // Setup event listeners
-      store.on('listener1', 'countChanged', eventSpy);
-      store.on('listener2', 'countChanged', anotherEventSpy);
+      const listener1 = store.on('countChanged', eventSpy);
+      const listener2 = store.on('countChanged', anotherEventSpy);
 
       // Trigger event through action
       store.dispatch.increment();
@@ -404,7 +404,7 @@ describe('Store Core Functionality', () => {
       expect(anotherEventSpy).toHaveBeenCalledWith({ count: 1 });
 
       // Remove one listener
-      store.off('listener1');
+      listener1.off();
 
       store.dispatch.increment();
 
@@ -526,7 +526,7 @@ describe('Store Core Functionality', () => {
         })
       });
 
-      store.on('test-listener', 'test', eventSpy);
+      const testListener = store.on('test', eventSpy);
       store.dispatch.increment();
       expect(eventSpy).toHaveBeenCalledTimes(1);
 
@@ -839,8 +839,8 @@ describe('Complex Scenarios', () => {
     });
 
     // Test event system
-    store.on('todo-listener', 'todoAdded', todoAddedSpy);
-    store.on('stats-listener', 'statsUpdated', statsUpdatedSpy);
+    const todoListener = store.on('todoAdded', todoAddedSpy);
+    const statsListener = store.on('statsUpdated', statsUpdatedSpy);
 
     // Test async operations - should start with empty todos
     expect(store.get((s) => s.todos)).toHaveLength(0);

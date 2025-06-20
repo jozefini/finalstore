@@ -63,7 +63,8 @@ type PayloadByAction<TActions> = {
 
 // Event types
 type EventCallback<TPayload = unknown> = (payload: TPayload) => void;
-type EventMap<TEvents> = Map<string, Map<string, EventCallback<any>>>;
+type EventListener = { off: () => void };
+type EventMap = Map<string, Set<EventCallback<any>>>;
 type EventPayload<
   TEvents,
   TEventName extends keyof TEvents
@@ -108,11 +109,9 @@ type InferStore<
   reset: () => void;
   batch: (callback: () => void) => void; // Batching API
   on: <TEventName extends keyof TEvents>(
-    id: string,
     eventName: TEventName,
     callback: (payload: EventPayload<TEvents, TEventName>) => void
-  ) => void;
-  off: (id: string) => void;
+  ) => EventListener;
 };
 
 // Utility for batching updates
@@ -269,7 +268,7 @@ export function createStore<
   let stateVersion = 0;
 
   // Create event map
-  const events: EventMap<TEvents> = new Map();
+  const events: EventMap = new Map();
 
   // Create a batcher for update batching
   const {
@@ -360,21 +359,21 @@ export function createStore<
   }
 
   function on<TEventName extends keyof TEvents>(
-    id: string,
     eventName: TEventName,
     callback: (payload: EventPayload<TEvents, TEventName>) => void
-  ) {
+  ): EventListener {
     if (!events.has(eventName as string)) {
-      events.set(eventName as string, new Map());
+      events.set(eventName as string, new Set());
     }
     const eventCallbacks = events.get(eventName as string)!;
-    eventCallbacks.set(id, callback as EventCallback);
-  }
+    const typedCallback = callback as EventCallback;
+    eventCallbacks.add(typedCallback);
 
-  function off(id: string) {
-    events.forEach((eventCallbacks) => {
-      eventCallbacks.delete(id);
-    });
+    return {
+      off: () => {
+        eventCallbacks.delete(typedCallback);
+      }
+    };
   }
 
   // Initialize actions and selectors with provided functions or empty objects
@@ -735,8 +734,7 @@ export function createStore<
     get: get as typeof get & TSelectors,
     reset,
     batch: batchActions,
-    on,
-    off
+    on
   };
 }
 

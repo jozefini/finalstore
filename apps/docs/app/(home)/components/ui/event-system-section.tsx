@@ -21,33 +21,33 @@ const cartStore = createStore<States, Actions, {}, Events>({
   },
   actions: ({ states, trigger }) => ({
     addToCart(item) {
-      states.cart.push(item)
-      trigger('itemAdded', item)
+      const foundItem = states.cart.find(i => i.id === item.id)
+      if (!foundItem) {
+        states.cart.push(item)
+        trigger('itemAdded', item)
+      }
     },
     removeFromCart(id) {
-      const item = states.cart.find(i => i.id === id)
-      if (item) {
+      const foundItem = states.cart.find(i => i.id === id)
+      if (foundItem) {
         states.cart = states.cart.filter(i => i.id !== id)
-        trigger('itemRemoved', item)
+        trigger('itemRemoved', id)
       }
     }
   })
 })
 
 // Listen to events for side effects
-cartStore.on('analytics', 'itemAdded', (item) => {
+const addedListener = cartStore.on('itemAdded', (item) => {
   track('Item Added', { productId: item.id, price: item.price })
 })
-cartStore.on('notifications', 'itemAdded', (item) => {
-  showToast(\`Added \${item.name} to cart\`)
-})
-cartStore.on('notifications', 'itemRemoved', (item) => {
-  showToast(\`Removed \${item.name} from cart\`)
+const removedListener = cartStore.on('itemRemoved', (id) => {
+  track('Item Removed', { productId: id })
 })
 
 // Cleanup when component unmounts
-cartStore.off('analytics')
-cartStore.off('notifications')
+addedListener.off()
+removedListener.off()
 `;
 
 export function EventSystemSection() {
@@ -126,8 +126,8 @@ export function EventSystemSection() {
                   Listen & React
                 </h3>
                 <p className="text-fd-muted-foreground text-sm leading-relaxed lg:text-base">
-                  Subscribe to events with unique IDs for analytics, logging,
-                  and notifications.
+                  Subscribe to events and get individual unsubscribe methods for
+                  each listener.
                 </p>
               </div>
             </div>
