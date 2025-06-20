@@ -1,24 +1,12 @@
 import Link from 'next/link';
 import { Github } from 'lucide-react';
 
-// import {
-//   MapExample,
-//   MapStressTest,
-//   StoreExample
-// } from '../../../../packages/store/src/concept';
-
-import { TodoControls } from './components/collection/todo-controls';
-import { TodoList } from './components/collection/todo-list';
-import { Counter } from './components/store/counter-text';
-import { TextControl } from './components/store/text-control';
-import { ThemeToggle } from './components/store/theme-toggle';
-import { Window } from './components/ui/window';
 import {
   AsyncTest,
   BasicStoreTest,
   BatchingTest,
   PerformanceTest
-} from './store-test';
+} from './components/ui/store-test';
 
 export default function HomePage() {
   return (

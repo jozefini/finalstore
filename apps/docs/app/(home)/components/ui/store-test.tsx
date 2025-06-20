@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { createStore } from '../../../../packages/store/src/store';
+import { createStore } from '../../../../../../packages/store/src/store';
 import { PreviewFrame } from './preview';
 
 // Test Store Setup
