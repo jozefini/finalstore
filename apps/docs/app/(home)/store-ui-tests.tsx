@@ -855,7 +855,7 @@ function StressTest() {
 
   const stressTestSeparate = () => {
     const start = performance.now();
-    const count = 100; // Lower count for separate operations
+    const count = 1000; // Same count for fair comparison
 
     for (let i = 0; i < count; i++) {
       testStore.dispatch.increment();
@@ -865,7 +865,7 @@ function StressTest() {
     setResults((prev) => [
       ...prev.slice(-2),
       {
-        operation: 'Separate 100 increments',
+        operation: 'Separate 1000 increments',
         count,
         duration: parseFloat(duration.toFixed(2))
       }
@@ -890,7 +890,7 @@ function StressTest() {
           onClick={stressTestSeparate}
           className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-700"
         >
-          Separate 100 Ops
+          Separate 1000 Ops
         </button>
       </div>
 
@@ -963,9 +963,9 @@ function PerformanceTest() {
       color: 'bg-green-500 hover:bg-green-600'
     },
     {
-      name: 'Separate 10x',
+      name: 'Separate 100x',
       operation: () => {
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 100; i++) {
           testStore.dispatch.increment();
         }
       },
