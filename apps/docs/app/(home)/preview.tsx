@@ -15,7 +15,7 @@ export function PreviewFrame({
   code = '',
   title,
   children,
-  className = 'max-w-2xl'
+  className = 'max-w-3xl'
 }: PreviewFrameProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
   const [copied, setCopied] = useState(false);
@@ -34,7 +34,7 @@ export function PreviewFrame({
 
   return (
     <div
-      className={`border-fd-border bg-fd-card overflow-hidden rounded-lg border ${className}`}
+      className={`border-fd-border bg-fd-card mx-auto overflow-hidden rounded-lg border ${className}`}
     >
       {/* Browser-style Header with Title and Tabs */}
       <div className="border-fd-border border-b">

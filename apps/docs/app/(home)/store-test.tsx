@@ -29,7 +29,6 @@ type TestActions = {
   addItem: (item: string) => void;
   removeItem: (index: number) => void;
   updateNestedValue: (value: string) => void;
-  reset: () => void;
 };
 
 type TestSelectors = {
@@ -60,12 +59,6 @@ const testStore = createStore<TestStates, TestActions, TestSelectors>({
     },
     updateNestedValue: (value: string) => {
       states.nested.level1.level2.value = value;
-    },
-    reset: () => {
-      states.counter = initialStates.counter;
-      states.name = initialStates.name;
-      states.items = [...initialStates.items];
-      states.nested = JSON.parse(JSON.stringify(initialStates.nested));
     }
   }),
   selectors: ({ states }) => ({
@@ -146,7 +139,7 @@ function StoreActions() {
           Nested
         </button>
         <button
-          onClick={() => testStore.dispatch.reset()}
+          onClick={() => testStore.reset()}
           className="rounded bg-gray-500 px-2 py-1 text-xs text-white hover:bg-gray-600"
         >
           Reset
@@ -291,7 +284,6 @@ const testStore = createStore<TestStates, TestActions, TestSelectors>({
     updateNestedValue: (value: string) => {
       states.nested.level1.level2.value = value;
     },
-    reset: () => { /* reset all states */ }
   }),
   selectors: ({ states }) => ({
     getCounterId: () => \`counter-\${states.counter}\`,
