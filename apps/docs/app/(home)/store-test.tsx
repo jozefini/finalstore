@@ -10,6 +10,7 @@ const initialStates = {
   counter: 0,
   name: 'Test Store',
   items: [] as string[],
+  batchCounter: 0,
   theme: 'light' as 'light' | 'dark',
   nested: {
     level1: {
@@ -265,6 +266,89 @@ function SelectorsDisplay() {
   );
 }
 
+// Batching Components
+function BatchingActions() {
+  const renderCount = useRenderCounter();
+
+  // Track state changes
+  const counter = testStore.use((state) => state.counter);
+  const name = testStore.use((state) => state.name);
+  const itemsLength = testStore.use((state) => state.items.length);
+  const nestedValue = testStore.use(
+    (state) => state.nested.level1.level2.value
+  );
+
+  const testBatchedOperations = () => {
+    testStore.batch(() => {
+      testStore.dispatch.increment();
+      testStore.dispatch.setName('Batched Update');
+      testStore.dispatch.addItem('Batch Item');
+      testStore.dispatch.updateNestedValue('Batched Value');
+    });
+  };
+
+  const testSeparateOperations = () => {
+    testStore.dispatch.increment();
+    testStore.dispatch.setName('Separate Update');
+    testStore.dispatch.addItem('Separate Item');
+    testStore.dispatch.updateNestedValue('Separate Value');
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Test Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={testBatchedOperations}
+          className="flex-1 rounded bg-green-500 px-3 py-1 text-xs text-white hover:bg-green-600"
+        >
+          ⚡ Batched Ops
+        </button>
+        <button
+          onClick={testSeparateOperations}
+          className="flex-1 rounded bg-orange-500 px-3 py-1 text-xs text-white hover:bg-orange-600"
+        >
+          🔄 Separate Ops
+        </button>
+      </div>
+
+      {/* Current State */}
+      <div className="rounded border border-green-200 bg-green-50 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-green-800">
+            Current State
+          </span>
+          <span className="text-xs text-green-600" suppressHydrationWarning>
+            Renders: {renderCount}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-green-700">Counter:</span>
+            <span className="font-mono text-green-900">{counter}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-green-700">Items:</span>
+            <span className="font-mono text-green-900">{itemsLength}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-green-700">Name:</span>
+            <span className="max-w-20 truncate font-mono text-green-900">
+              {name}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-green-700">Nested:</span>
+            <span className="max-w-20 truncate font-mono text-green-900">
+              {nestedValue}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BasicStoreTest() {
   const storeActionsCode = `
 // Store Setup
@@ -316,6 +400,70 @@ function SelectorsDisplay() {
   return (
     <PreviewFrame code={storeActionsCode} title="Basic Store Operations">
       <StoreActions />
+    </PreviewFrame>
+  );
+}
+
+export function BatchingTest() {
+  const batchingCode = `
+// Batching Demo - Multiple different actions
+const testStore = createStore({
+  states: {
+    counter: 0,
+    name: 'Test Store',
+    items: [] as string[],
+    nested: { level1: { level2: { value: 'deep value' } } }
+  },
+  actions: ({ states }) => ({
+    increment: () => { states.counter += 1; },
+    setName: (name: string) => { states.name = name; },
+    addItem: (item: string) => { states.items.push(item); },
+    updateNestedValue: (value: string) => {
+      states.nested.level1.level2.value = value;
+    }
+  })
+});
+
+// Usage - Batched vs Separate
+function BatchingExample() {
+  const renderCount = useRenderCounter();
+  const counter = testStore.use((state) => state.counter);
+  const name = testStore.use((state) => state.name);
+  const itemsLength = testStore.use((state) => state.items.length);
+  const nestedValue = testStore.use((state) => state.nested.level1.level2.value);
+
+  // Batched: Multiple operations in single render cycle
+  const runBatched = () => {
+    testStore.batch(() => {
+      testStore.dispatch.increment();
+      testStore.dispatch.setName('Batched Update');
+      testStore.dispatch.addItem('Batch Item');
+      testStore.dispatch.updateNestedValue('Batched Value');
+    });
+  };
+
+  // Separate: Each operation triggers its own render
+  const runSeparate = () => {
+    testStore.dispatch.increment();
+    testStore.dispatch.setName('Separate Update');
+    testStore.dispatch.addItem('Separate Item');
+    testStore.dispatch.updateNestedValue('Separate Value');
+  };
+
+  return (
+    <div>
+      <button onClick={runBatched}>⚡ Batched (1 render)</button>
+      <button onClick={runSeparate}>🔄 Separate (4 renders)</button>
+      <div>Counter: {counter}, Items: {itemsLength}</div>
+      <div>Name: {name}, Nested: {nestedValue}</div>
+      <div>Renders: {renderCount}</div>
+    </div>
+  );
+}`;
+
+  return (
+    <PreviewFrame code={batchingCode} title="Batching vs Separate Operations">
+      <BatchingActions />
     </PreviewFrame>
   );
 }

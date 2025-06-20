@@ -13,7 +13,7 @@ import { Counter } from './components/store/counter-text';
 import { TextControl } from './components/store/text-control';
 import { ThemeToggle } from './components/store/theme-toggle';
 import { Window } from './components/ui/window';
-import { BasicStoreTest } from './store-test';
+import { BasicStoreTest, BatchingTest } from './store-test';
 import { StoreUITests } from './store-ui-tests';
 
 export default function HomePage() {
@@ -24,6 +24,7 @@ export default function HomePage() {
           Type-safe state management for React
         </h1>
         <BasicStoreTest />
+        <BatchingTest />
         <StoreUITests />
         <p className="text-fd-muted-foreground mt-4 text-xl">
           Simple yet powerful state management with first-class TypeScript
