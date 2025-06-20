@@ -34,7 +34,7 @@ export function PreviewFrame({
 
   return (
     <div
-      className={`border-fd-border bg-fd-card mx-auto overflow-hidden rounded-lg border ${className}`}
+      className={`border-fd-border bg-fd-card mx-auto w-full overflow-hidden rounded-lg border ${className}`}
     >
       {/* Browser-style Header with Title and Tabs */}
       <div className="border-fd-border border-b">
@@ -77,7 +77,7 @@ export function PreviewFrame({
       {/* Content */}
       <div className="relative">
         {activeTab === 'preview' && (
-          <div className="max-h-[300px] bg-white p-6">
+          <div className="bg-white p-6">
             <div className="flex items-center justify-center">{children}</div>
           </div>
         )}

@@ -13,8 +13,12 @@ import { Counter } from './components/store/counter-text';
 import { TextControl } from './components/store/text-control';
 import { ThemeToggle } from './components/store/theme-toggle';
 import { Window } from './components/ui/window';
-import { AsyncTest, BasicStoreTest, BatchingTest } from './store-test';
-import { StoreUITests } from './store-ui-tests';
+import {
+  AsyncTest,
+  BasicStoreTest,
+  BatchingTest,
+  PerformanceTest
+} from './store-test';
 
 export default function HomePage() {
   return (
@@ -23,10 +27,6 @@ export default function HomePage() {
         <h1 className="text-6xl font-bold tracking-tight">
           Type-safe state management for React
         </h1>
-        <BasicStoreTest />
-        <BatchingTest />
-        <AsyncTest />
-        <StoreUITests />
         <p className="text-fd-muted-foreground mt-4 text-xl">
           Simple yet powerful state management with first-class TypeScript
           support. Zero configuration, built-in DevTools, and collection
@@ -52,25 +52,11 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="mx-auto mt-20 w-full max-w-[900px]">
-        <Window title="Store">
-          <div className="p-6">
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <ThemeToggle />
-                <Counter />
-              </div>
-              <TextControl />
-            </div>
-          </div>
-        </Window>
-
-        <Window title="Collection" className="mt-8">
-          <div className="space-y-4 p-6">
-            <TodoControls />
-            <TodoList />
-          </div>
-        </Window>
+      <div className="mx-auto mt-20 grid w-full max-w-2xl gap-y-10">
+        <BasicStoreTest />
+        <BatchingTest />
+        <AsyncTest />
+        <PerformanceTest />
       </div>
 
       <div className="mx-auto mt-20 grid w-full max-w-[900px] grid-cols-1 gap-6 px-4 md:grid-cols-3">

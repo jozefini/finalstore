@@ -286,6 +286,246 @@ function SelectorsDisplay() {
 }
 
 // Batching Components
+function PerformanceTests() {
+  const renderCount = useRenderCounter();
+  const [activeTab, setActiveTab] = useState<'batching' | 'stress' | 'memory'>(
+    'batching'
+  );
+  const [results, setResults] = useState<
+    {
+      test: string;
+      duration: number;
+      renders: number;
+      timestamp: number;
+    }[]
+  >([]);
+
+  const addResult = (test: string, duration: number, renders: number) => {
+    setResults((prev) => [
+      ...prev.slice(-4),
+      { test, duration, renders, timestamp: Date.now() }
+    ]);
+  };
+
+  // Batching Performance Test
+  const testBatchedOps = () => {
+    const start = performance.now();
+    const rendersBefore = renderCount;
+
+    testStore.batch(() => {
+      testStore.dispatch.increment();
+      testStore.dispatch.setName('Batch Test');
+      testStore.dispatch.addItem('Batch Item');
+      testStore.dispatch.updateNestedValue('Batch Value');
+    });
+
+    setTimeout(() => {
+      const duration = performance.now() - start;
+      const rendersAfter = renderCount;
+      addResult('Batched (4 ops)', duration, rendersAfter - rendersBefore);
+    }, 10);
+  };
+
+  const testSeparateOps = () => {
+    const start = performance.now();
+    const rendersBefore = renderCount;
+
+    testStore.dispatch.increment();
+    testStore.dispatch.setName('Separate Test');
+    testStore.dispatch.addItem('Separate Item');
+    testStore.dispatch.updateNestedValue('Separate Value');
+
+    setTimeout(() => {
+      const duration = performance.now() - start;
+      const rendersAfter = renderCount;
+      addResult('Separate (4 ops)', duration, rendersAfter - rendersBefore);
+    }, 50);
+  };
+
+  // Stress Test
+  const testBatchedStress = () => {
+    const start = performance.now();
+    const rendersBefore = renderCount;
+
+    testStore.batch(() => {
+      for (let i = 0; i < 100; i++) {
+        testStore.dispatch.increment();
+      }
+    });
+
+    setTimeout(() => {
+      const duration = performance.now() - start;
+      const rendersAfter = renderCount;
+      addResult('Batched 100x', duration, rendersAfter - rendersBefore);
+    }, 10);
+  };
+
+  const testSeparateStress = () => {
+    const start = performance.now();
+    const rendersBefore = renderCount;
+
+    for (let i = 0; i < 100; i++) {
+      testStore.dispatch.increment();
+    }
+
+    setTimeout(() => {
+      const duration = performance.now() - start;
+      const rendersAfter = renderCount;
+      addResult('Separate 100x', duration, rendersAfter - rendersBefore);
+    }, 200);
+  };
+
+  // Memory/Component Test
+  const [componentCount, setComponentCount] = useState(0);
+  const [showComponents, setShowComponents] = useState(false);
+
+  return (
+    <div className="min-w-xs space-y-3">
+      {/* Tab Navigation */}
+      <div className="flex rounded bg-gray-100 p-1">
+        {[
+          { key: 'batching', label: 'Batching', icon: '⚡' },
+          { key: 'stress', label: 'Stress', icon: '🔥' },
+          { key: 'memory', label: 'Memory', icon: '🧠' }
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() =>
+              setActiveTab(tab.key as 'batching' | 'stress' | 'memory')
+            }
+            className={`flex-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+              activeTab === tab.key
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'batching' && (
+        <div className="space-y-2">
+          <div className="flex gap-1">
+            <button
+              onClick={testBatchedOps}
+              className="flex-1 rounded bg-green-500 px-2 py-1 text-xs text-white hover:bg-green-600"
+            >
+              ⚡ Batched
+            </button>
+            <button
+              onClick={testSeparateOps}
+              className="flex-1 rounded bg-orange-500 px-2 py-1 text-xs text-white hover:bg-orange-600"
+            >
+              🔄 Separate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'stress' && (
+        <div className="space-y-2">
+          <div className="flex gap-1">
+            <button
+              onClick={testBatchedStress}
+              className="flex-1 rounded bg-green-500 px-2 py-1 text-xs text-white hover:bg-green-600"
+            >
+              ⚡ Batch 100x
+            </button>
+            <button
+              onClick={testSeparateStress}
+              className="flex-1 rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+            >
+              🔥 Separate 100x
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'memory' && (
+        <div className="space-y-2">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setComponentCount((prev) => prev + 10)}
+              className="flex-1 rounded bg-blue-500 px-2 py-1 text-xs text-white hover:bg-blue-600"
+            >
+              +10 Components
+            </button>
+            <button
+              onClick={() => setShowComponents(!showComponents)}
+              className="flex-1 rounded bg-purple-500 px-2 py-1 text-xs text-white hover:bg-purple-600"
+            >
+              {showComponents ? 'Hide' : 'Show'} ({componentCount})
+            </button>
+            <button
+              onClick={() => {
+                setComponentCount(0);
+                setShowComponents(false);
+              }}
+              className="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+            >
+              Clear
+            </button>
+          </div>
+          {showComponents && componentCount > 0 && (
+            <div className="grid grid-cols-5 gap-1">
+              {Array.from({ length: componentCount }, (_, i) => (
+                <TempCounter key={i} id={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Results Display */}
+      <div className="rounded border border-gray-200 bg-gray-50 p-2">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-800">
+            Performance Results
+          </span>
+          <span className="text-xs text-gray-600" suppressHydrationWarning>
+            Renders: {renderCount}
+          </span>
+        </div>
+        <div className="max-h-20 min-h-[60px] space-y-1 overflow-y-auto">
+          {results.length === 0 ? (
+            <p className="py-2 text-center text-xs italic text-gray-500">
+              No results yet... Run a test above!
+            </p>
+          ) : (
+            results.map((result, index) => (
+              <div
+                key={index}
+                className="flex justify-between rounded bg-white px-2 py-1 text-xs"
+              >
+                <span className="text-gray-700">{result.test}</span>
+                <div className="flex gap-2 font-mono">
+                  <span className="text-blue-600">
+                    {result.duration.toFixed(1)}ms
+                  </span>
+                  <span className="text-green-600">{result.renders}r</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Temporary counter component for memory testing
+function TempCounter({ id }: { id: number }) {
+  const counter = testStore.use((state) => state.counter);
+  return (
+    <div className="rounded bg-blue-100 p-1 text-center text-xs">
+      <div className="text-blue-800">#{id}</div>
+      <div className="font-mono text-blue-900">{counter}</div>
+    </div>
+  );
+}
+
 function AsyncOperations() {
   const renderCount = useRenderCounter();
   const loading = testStore.use((state) => state.loading);
@@ -625,6 +865,90 @@ function AsyncExample() {
   return (
     <PreviewFrame code={asyncCode} title="Async Operations">
       <AsyncOperations />
+    </PreviewFrame>
+  );
+}
+
+export function PerformanceTest() {
+  const performanceCode = `
+// Performance Testing Suite
+const testStore = createStore({
+  states: {
+    counter: 0,
+    name: 'Test Store',
+    items: [] as string[],
+    nested: { level1: { level2: { value: 'deep value' } } }
+  },
+  actions: ({ states }) => ({
+    increment: () => { states.counter += 1; },
+    setName: (name: string) => { states.name = name; },
+    addItem: (item: string) => { states.items.push(item); },
+    updateNestedValue: (value: string) => {
+      states.nested.level1.level2.value = value;
+    }
+  })
+});
+
+// Performance Test Component
+function PerformanceTests() {
+  const renderCount = useRenderCounter();
+  const [activeTab, setActiveTab] = useState('batching');
+  const [results, setResults] = useState([]);
+
+  // Batching vs Separate Operations
+  const testBatched = () => {
+    const start = performance.now();
+    const rendersBefore = renderCount;
+
+    testStore.batch(() => {
+      testStore.dispatch.increment();
+      testStore.dispatch.setName('Batch Test');
+      testStore.dispatch.addItem('Batch Item');
+      testStore.dispatch.updateNestedValue('Batch Value');
+    });
+
+    // Measure after async completion
+    setTimeout(() => {
+      const duration = performance.now() - start;
+      const renders = renderCount - rendersBefore;
+      addResult('Batched (4 ops)', duration, renders);
+    }, 10);
+  };
+
+  // Stress Testing
+  const testStress = () => {
+    const start = performance.now();
+
+    testStore.batch(() => {
+      for (let i = 0; i < 100; i++) {
+        testStore.dispatch.increment();
+      }
+    });
+
+    const duration = performance.now() - start;
+    console.log(\`Stress test completed in \${duration.toFixed(2)}ms\`);
+  };
+
+  // Memory Testing with Multiple Components
+  const [componentCount, setComponentCount] = useState(0);
+
+  return (
+    <div>
+      <div>Tab: {activeTab}</div>
+      <button onClick={testBatched}>⚡ Test Batching</button>
+      <button onClick={testStress}>🔥 Stress Test</button>
+      <button onClick={() => setComponentCount(count => count + 10)}>
+        +10 Components ({componentCount})
+      </button>
+      <div>Results: {results.length} tests completed</div>
+      <div>Renders: {renderCount}</div>
+    </div>
+  );
+}`;
+
+  return (
+    <PreviewFrame code={performanceCode} title="Performance Testing Suite">
+      <PerformanceTests />
     </PreviewFrame>
   );
 }
