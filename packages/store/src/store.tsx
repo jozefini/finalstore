@@ -118,12 +118,14 @@ type InferStore<
 const createBatcher = () => {
   let isBatching = false;
   let notifyCallback: (() => void) | null = null;
+  let batchedActions: { type: string; payload: any }[] = [];
 
   const batch = (fn: () => void, notify: () => void) => {
     if (!isBatching) {
       // If not already batching, start a new batch
       isBatching = true;
       notifyCallback = notify;
+      batchedActions = [];
       try {
         fn();
       } finally {
@@ -135,6 +137,7 @@ const createBatcher = () => {
           notifyCallback = null;
           cb();
         }
+        batchedActions = [];
       }
     } else {
       // If already batching, just execute the function
@@ -144,8 +147,20 @@ const createBatcher = () => {
   };
 
   const shouldNotify = () => !isBatching;
+  const getBatchedActions = () => batchedActions;
+  const addBatchedAction = (action: { type: string; payload: any }) => {
+    if (isBatching) {
+      batchedActions.push(action);
+    }
+  };
 
-  return { batch, shouldNotify };
+  return {
+    batch,
+    shouldNotify,
+    getBatchedActions,
+    addBatchedAction,
+    isBatching: () => isBatching
+  };
 };
 
 // HELPERS:
@@ -252,7 +267,13 @@ export function createStore<
   const events: EventMap<TEvents> = new Map();
 
   // Create a batcher for update batching
-  const { batch, shouldNotify } = createBatcher();
+  const {
+    batch,
+    shouldNotify,
+    getBatchedActions,
+    addBatchedAction,
+    isBatching
+  } = createBatcher();
 
   // Create a proxy for states that always points to the current value
   const statesProxy = new Proxy({} as TState, {
@@ -450,19 +471,27 @@ export function createStore<
     Object.keys(actions).reduce((acc, actionKey) => {
       acc[actionKey] = (payload?: AnyType) => {
         const cb = actions[actionKey];
+        const actionInfo = { type: String(actionKey), payload };
 
         // Execute the action
         const result = cb(payload);
 
-        // Create a new reference for the state object so React detects changes
-        states = deepClone(states);
+        // Only clone state if not batching (optimization)
+        if (!isBatching()) {
+          states = deepClone(states);
+        }
 
         if (result instanceof Promise) {
           // For async actions, handle the promise properly
           return result.then((finalResult) => {
+            // For async actions, always clone and notify since they complete outside batch
+            if (isBatching()) {
+              states = deepClone(states);
+            }
+
             // Send to DevTools after async completion
             if (devTools && !pauseDevTools) {
-              devTools.send({ type: String(actionKey), payload }, states);
+              devTools.send(actionInfo, states);
             }
 
             notify();
@@ -470,9 +499,15 @@ export function createStore<
           });
         }
 
-        // Send to DevTools
-        if (devTools && !pauseDevTools) {
-          devTools.send({ type: String(actionKey), payload }, states);
+        // Handle DevTools for batched vs non-batched actions
+        if (isBatching()) {
+          // Collect action for batch DevTools message
+          addBatchedAction(actionInfo);
+        } else {
+          // Send to DevTools immediately for non-batched actions
+          if (devTools && !pauseDevTools) {
+            devTools.send(actionInfo, states);
+          }
         }
 
         if (shouldNotify()) {
@@ -488,16 +523,29 @@ export function createStore<
 
   // Run multiple actions in a batch with a single notification at the end
   function batchActions(callback: () => void) {
-    const prevState = deepClone(states);
     batch(
       () => {
         callback();
+        // Clone state once at the end of batch (optimization)
         states = deepClone(states);
       },
       () => {
-        if (!isDeepEqual(prevState, states)) {
-          notify();
+        // Send batched actions to DevTools as a single group
+        if (devTools && !pauseDevTools) {
+          const batchedActionsList = getBatchedActions();
+          if (batchedActionsList.length > 0) {
+            devTools.send(
+              {
+                type: 'BATCH',
+                payload: batchedActionsList
+              },
+              states
+            );
+          }
         }
+
+        // Always notify after batch (no expensive deep equality check)
+        notify();
       }
     );
   }
