@@ -538,7 +538,7 @@ describe('Store Core Functionality', () => {
   });
 
   describe('DevTools Integration', () => {
-    it('should integrate with Redux DevTools when enabled', () => {
+    it('should integrate with Redux DevTools when enabled', async () => {
       const store = createStore({
         states: { count: 0 },
         actions: ({ states }) => ({
@@ -568,11 +568,55 @@ describe('Store Core Functionality', () => {
 
       expect(mockDevTools.init).toHaveBeenCalledWith({ count: 0 });
 
-      // Test that actions are sent to devtools
+      // Test that actions are sent to devtools (now async due to microtask optimization)
       store.dispatch.increment();
+
+      // Wait for microtask to complete
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+
       expect(mockDevTools.send).toHaveBeenCalledWith(
         { type: 'increment', payload: undefined },
         { count: 1 }
+      );
+    });
+
+    it('should batch multiple rapid actions in DevTools', async () => {
+      const store = createStore({
+        states: { count: 0 },
+        actions: ({ states }) => ({
+          increment: () => {
+            states.count += 1;
+          }
+        }),
+        config: {
+          name: 'Batch Test Store',
+          devtools: true
+        }
+      });
+
+      // Clear previous calls
+      mockDevTools.send.mockClear();
+
+      // Dispatch multiple actions rapidly (should be batched)
+      store.dispatch.increment();
+      store.dispatch.increment();
+      store.dispatch.increment();
+
+      // Wait for microtask to complete
+      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+
+      // Should have been called once with a batch
+      expect(mockDevTools.send).toHaveBeenCalledTimes(1);
+      expect(mockDevTools.send).toHaveBeenCalledWith(
+        {
+          type: 'MICROTASK_BATCH',
+          payload: [
+            { type: 'increment', payload: undefined },
+            { type: 'increment', payload: undefined },
+            { type: 'increment', payload: undefined }
+          ]
+        },
+        { count: 3 }
       );
     });
   });

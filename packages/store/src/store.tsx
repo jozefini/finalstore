@@ -263,6 +263,10 @@ export function createStore<
   const initialStates = deepClone(props.states);
   let states = deepClone(initialStates);
 
+  // State change tracking for optimization
+  let stateChanged = false;
+  let stateVersion = 0;
+
   // Create event map
   const events: EventMap<TEvents> = new Map();
 
@@ -289,6 +293,10 @@ export function createStore<
   // DevTools setup
   let devTools: DevTools | null = null;
   let pauseDevTools = false;
+
+  // Microtask batching for performance
+  let microtaskScheduled = false;
+  let pendingDevToolsActions: { type: string; payload: any }[] = [];
 
   // Setup DevTools if enabled
   if (typeof window !== 'undefined' && props.config?.devtools) {
@@ -414,14 +422,17 @@ export function createStore<
   function memoizeSelector<T>(
     selector: (state: TState) => T
   ): (state: TState) => T {
-    // Return a memoized version of the selector
+    // Return a memoized version of the selector using stateVersion for better performance
     return (state: TState) => {
       const cache = selectorCache.get(selector);
 
-      if (!cache || cache.lastState !== state) {
-        // If no cache entry or state reference changed, compute the result
+      if (!cache || cache.lastStateVersion !== stateVersion) {
+        // If no cache entry or state version changed, compute the result
         const result = selector(state);
-        selectorCache.set(selector, { lastState: state, lastResult: result });
+        selectorCache.set(selector, {
+          lastStateVersion: stateVersion,
+          lastResult: result
+        });
         return result;
       }
 
@@ -451,17 +462,54 @@ export function createStore<
     };
   }
 
+  // Optimized notification with microtask batching
+  function scheduleNotification() {
+    if (!microtaskScheduled) {
+      microtaskScheduled = true;
+      queueMicrotask(() => {
+        notify();
+        microtaskScheduled = false;
+      });
+    }
+  }
+
   function notify() {
-    const subs = Array.from(subscriberMap.values());
     const currentState = getState();
 
-    for (const sub of subs) {
+    // Use for-of loop directly on Map.values() for better performance
+    for (const sub of subscriberMap.values()) {
       const selector = sub.memoizedSelector || sub.selector;
       const newValue = selector(currentState);
 
       if (!isDeepEqual(newValue, sub.lastValue)) {
         sub.lastValue = newValue;
         sub.callback();
+      }
+    }
+  }
+
+  // Optimized DevTools with deferred sending
+  function scheduleDevTools(actionInfo: { type: string; payload: any }) {
+    if (devTools && !pauseDevTools) {
+      pendingDevToolsActions.push(actionInfo);
+
+      if (!microtaskScheduled) {
+        queueMicrotask(() => {
+          if (pendingDevToolsActions.length === 1) {
+            // Single action - send directly
+            devTools!.send(pendingDevToolsActions[0], states);
+          } else if (pendingDevToolsActions.length > 1) {
+            // Multiple actions - send as batch
+            devTools!.send(
+              {
+                type: 'MICROTASK_BATCH',
+                payload: pendingDevToolsActions
+              },
+              states
+            );
+          }
+          pendingDevToolsActions = [];
+        });
       }
     }
   }
@@ -476,25 +524,29 @@ export function createStore<
         // Execute the action
         const result = cb(payload);
 
+        // Always mark as changed when action runs (safe approach for all mutations)
+        stateChanged = true;
+
         // Only clone state if not batching (optimization)
         if (!isBatching()) {
           states = deepClone(states);
+          stateVersion++; // Increment version for cache invalidation
         }
 
         if (result instanceof Promise) {
           // For async actions, handle the promise properly
           return result.then((finalResult) => {
-            // For async actions, always clone and notify since they complete outside batch
+            // For async actions, always clone since they complete outside batch
             if (isBatching()) {
               states = deepClone(states);
+              stateVersion++;
             }
 
-            // Send to DevTools after async completion
-            if (devTools && !pauseDevTools) {
-              devTools.send(actionInfo, states);
-            }
+            // Use optimized DevTools scheduling
+            scheduleDevTools(actionInfo);
 
-            notify();
+            // Use microtask scheduling for better performance
+            scheduleNotification();
             return finalResult;
           });
         }
@@ -504,14 +556,13 @@ export function createStore<
           // Collect action for batch DevTools message
           addBatchedAction(actionInfo);
         } else {
-          // Send to DevTools immediately for non-batched actions
-          if (devTools && !pauseDevTools) {
-            devTools.send(actionInfo, states);
-          }
+          // Use optimized DevTools scheduling for non-batched actions
+          scheduleDevTools(actionInfo);
         }
 
+        // Only notify if should notify (action always marks state as changed)
         if (shouldNotify()) {
-          notify();
+          scheduleNotification();
         }
 
         return result;
@@ -528,6 +579,7 @@ export function createStore<
         callback();
         // Clone state once at the end of batch (optimization)
         states = deepClone(states);
+        stateVersion++;
       },
       () => {
         // Send batched actions to DevTools as a single group
@@ -544,7 +596,7 @@ export function createStore<
           }
         }
 
-        // Always notify after batch (no expensive deep equality check)
+        // Always notify after batch
         notify();
       }
     );
@@ -554,6 +606,8 @@ export function createStore<
   function reset() {
     const prevStates = states;
     states = deepClone(initialStates);
+    stateChanged = true;
+    stateVersion++;
     events.clear(); // Clear all events on reset
 
     // Send to DevTools
