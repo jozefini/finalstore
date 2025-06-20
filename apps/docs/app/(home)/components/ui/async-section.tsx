@@ -4,33 +4,38 @@ const codeExample = `
 import { createStore } from 'finalstore'
 
 type States = {
-  count: number,
+  user: User | null
+  loading: boolean
 }
 type Actions = {
-  increment: () => void
-  decrement: () => void
-}
-type Selectors = {
-  isEven: () => boolean
-  isBiggerThan: (value: number) => boolean
+  fetchUser: (id: string) => Promise<User>
 }
 
-const store = createStore<States, Actions, Selectors>({
+const userStore = createStore<States, Actions>({
   states: {
-    count: 0,
+    user: null,
+    loading: false,
   },
-  actions: ({ states }) => ({
-    increment: () => { states.count += 1 },
-    decrement: () => { states.count -= 1 },
-  }),
-  selectors: ({ states }) => ({
-    isEven: () => states.count % 2 === 0,
-    isBiggerThan: (value) => states.count > value,
+  actions: ({ states, notify }) => ({
+    async fetchUser(id) {
+      states.loading = true
+      // Trigger UI updates to subscribed components of loading state
+      // Actions auto-notify at the end, but for async operations we want instant
+      // feedback to reflect spinner/loading UI before the async operation completes
+      notify()
+
+      const response = await fetch(\`/api/users/\${id}\`)
+      const user = await response.json()
+
+      states.user = user
+      states.loading = false
+      return user // Return promise values
+    },
   }),
 })
 `;
 
-export function ThreeWaySection() {
+export function AsyncSection() {
   return (
     <div className="relative mx-auto mt-32 w-full max-w-6xl px-4">
       {/* Background gradient */}
@@ -39,20 +44,21 @@ export function ThreeWaySection() {
       <div className="relative">
         <div className="mb-10 text-center">
           <h2 className="mb-4 text-4xl font-bold tracking-tight md:text-5xl">
-            Modular Architecture
+            Async Made Simple
           </h2>
           <p className="text-fd-muted-foreground mx-auto max-w-2xl text-xl">
-            Organized code. Connected logic. Zero complexity.
+            Handle complex async operations with confidence. Built-in loading
+            states, error handling, and automatic updates.
           </p>
         </div>
 
         <div className="flex flex-col gap-x-6 gap-y-6 lg:flex-row">
           {/* Left side - Cards (25% width on desktop) */}
-          <div className="flex flex-col gap-3 lg:w-1/4 lg:gap-5">
-            {/* States Card */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-blue-500/5 to-blue-600/10 p-4 lg:p-6">
+          <div className="flex flex-col gap-3 lg:order-2 lg:w-1/4 lg:gap-5">
+            {/* Async Mutations Card */}
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-orange-500/5 to-orange-600/10 p-4 lg:p-6">
               <div className="relative">
-                <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 lg:h-10 lg:w-10">
+                <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 lg:h-10 lg:w-10">
                   <svg
                     className="h-4 w-4 lg:h-5 lg:w-5"
                     fill="none"
@@ -63,23 +69,24 @@ export function ThreeWaySection() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7c0-2.21-1.79-4-4-4H8c-2.21 0-4 1.79-4 4z"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                     />
                   </svg>
                 </div>
-                <h3 className="mb-2 text-lg font-semibold text-blue-600 lg:text-xl">
-                  States
+                <h3 className="mb-2 text-lg font-semibold text-orange-600 lg:text-xl">
+                  Seamless Async
                 </h3>
                 <p className="text-fd-muted-foreground text-sm leading-relaxed lg:text-base">
-                  Type-safe data that lives in your store.
+                  Write async actions like sync ones. No thunks, no middleware,
+                  no complexity.
                 </p>
               </div>
             </div>
 
-            {/* Actions Card */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-green-500/5 to-green-600/10 p-4 lg:p-6">
+            {/* Notify Updates Card */}
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-teal-500/5 to-teal-600/10 p-4 lg:p-6">
               <div className="relative">
-                <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 text-green-600 lg:h-10 lg:w-10">
+                <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500/10 text-teal-600 lg:h-10 lg:w-10">
                   <svg
                     className="h-4 w-4 lg:h-5 lg:w-5"
                     fill="none"
@@ -90,23 +97,24 @@ export function ThreeWaySection() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                      d="M15 17h5l-5 5v-5zM9 13h6m-3-3v6m5 1V4a1 1 0 00-1-1H5a1 1 0 00-1 1v16a1 1 0 001 1h4"
                     />
                   </svg>
                 </div>
-                <h3 className="mb-2 text-lg font-semibold text-green-600 lg:text-xl">
-                  Actions
+                <h3 className="mb-2 text-lg font-semibold text-teal-600 lg:text-xl">
+                  Smart Notifications
                 </h3>
                 <p className="text-fd-muted-foreground text-sm leading-relaxed lg:text-base">
-                  Direct state mutations with async support.
+                  Automatic UI updates during async operations. Loading states
+                  handled for you.
                 </p>
               </div>
             </div>
 
-            {/* Selectors Card */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-purple-500/5 to-purple-600/10 p-4 lg:p-6">
+            {/* Return Values Card */}
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-indigo-500/5 to-indigo-600/10 p-4 lg:p-6">
               <div className="relative">
-                <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 lg:h-10 lg:w-10">
+                <div className="mb-3 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 lg:h-10 lg:w-10">
                   <svg
                     className="h-4 w-4 lg:h-5 lg:w-5"
                     fill="none"
@@ -117,15 +125,16 @@ export function ThreeWaySection() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
                 </div>
-                <h3 className="mb-2 text-lg font-semibold text-purple-600 lg:text-xl">
-                  Selectors
+                <h3 className="mb-2 text-lg font-semibold text-indigo-600 lg:text-xl">
+                  Promise-Aware
                 </h3>
                 <p className="text-fd-muted-foreground text-sm leading-relaxed lg:text-base">
-                  Computed values with automatic memoization.
+                  Actions return promises. Chain operations, handle errors, and
+                  compose async flows naturally.
                 </p>
               </div>
             </div>

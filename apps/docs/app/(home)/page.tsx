@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { AsyncSection } from './components/ui/async-section';
 import { HeroSection } from './components/ui/hero-section';
 import {
   AsyncTest,
@@ -15,6 +16,7 @@ export default function HomePage() {
       <HeroSection />
 
       <ThreeWaySection />
+      <AsyncSection />
 
       <div className="mx-auto mt-20 grid w-full max-w-2xl gap-y-10">
         <BasicStoreTest />
