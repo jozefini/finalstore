@@ -7,6 +7,7 @@ import {
   BatchingTest,
   PerformanceTest
 } from './components/ui/store-test';
+import { ThreeWaySection } from './components/ui/three-way-section';
 
 export default function HomePage() {
   return (
@@ -39,6 +40,8 @@ export default function HomePage() {
           </a>
         </div>
       </div>
+
+      <ThreeWaySection />
 
       <div className="mx-auto mt-20 grid w-full max-w-2xl gap-y-10">
         <BasicStoreTest />
