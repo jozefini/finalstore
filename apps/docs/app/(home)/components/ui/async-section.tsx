@@ -24,12 +24,10 @@ const userStore = createStore<States, Actions>({
       // feedback to reflect spinner/loading UI before the async operation completes
       notify()
 
-      const response = await fetch(\`/api/users/\${id}\`)
-      const user = await response.json()
-
-      states.user = user
+      states.user = await getUserById(id)
       states.loading = false
-      return user // Return promise values
+
+      return states.user
     },
   }),
 })
@@ -77,8 +75,7 @@ export function AsyncSection() {
                   Seamless Async
                 </h3>
                 <p className="text-fd-muted-foreground text-sm leading-relaxed lg:text-base">
-                  Write async actions like sync ones. No thunks, no middleware,
-                  no complexity.
+                  Super simple async actions. No thunks, no sagas, no headaches.
                 </p>
               </div>
             </div>
@@ -102,11 +99,10 @@ export function AsyncSection() {
                   </svg>
                 </div>
                 <h3 className="mb-2 text-lg font-semibold text-teal-600 lg:text-xl">
-                  Smart Notifications
+                  Live Updates
                 </h3>
                 <p className="text-fd-muted-foreground text-sm leading-relaxed lg:text-base">
-                  Automatic UI updates during async operations. Loading states
-                  handled for you.
+                  Automatic and manual UI updates like no other store.
                 </p>
               </div>
             </div>
@@ -133,8 +129,8 @@ export function AsyncSection() {
                   Promise-Aware
                 </h3>
                 <p className="text-fd-muted-foreground text-sm leading-relaxed lg:text-base">
-                  Actions return promises. Chain operations, handle errors, and
-                  compose async flows naturally.
+                  Actions return promises. Chain operations and handle errors
+                  naturally.
                 </p>
               </div>
             </div>

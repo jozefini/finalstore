@@ -42,7 +42,8 @@ export function ThreeWaySection() {
             Modular Architecture
           </h2>
           <p className="text-fd-muted-foreground mx-auto max-w-2xl text-xl">
-            Organized code. Connected logic. Zero complexity.
+            Separate concerns without losing connections. Type-safe states,
+            direct mutations, and computed selectors that just work.
           </p>
         </div>
 
