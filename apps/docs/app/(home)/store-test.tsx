@@ -10,8 +10,8 @@ const initialStates = {
   counter: 0,
   name: 'Test Store',
   items: [] as string[],
-  batchCounter: 0,
-  theme: 'light' as 'light' | 'dark',
+  loading: false,
+  asyncResult: null as string | null,
   nested: {
     level1: {
       level2: {
@@ -30,6 +30,7 @@ type TestActions = {
   addItem: (item: string) => void;
   removeItem: (index: number) => void;
   updateNestedValue: (value: string) => void;
+  simulateAsyncOperation: () => Promise<string>;
 };
 
 type TestSelectors = {
@@ -42,7 +43,7 @@ type TestSelectors = {
 
 const testStore = createStore<TestStates, TestActions, TestSelectors>({
   states: initialStates,
-  actions: ({ states }) => ({
+  actions: ({ states, notify }) => ({
     increment: () => {
       states.counter += 1;
     },
@@ -60,6 +61,24 @@ const testStore = createStore<TestStates, TestActions, TestSelectors>({
     },
     updateNestedValue: (value: string) => {
       states.nested.level1.level2.value = value;
+    },
+    simulateAsyncOperation: async () => {
+      states.loading = true;
+      states.asyncResult = null;
+      notify();
+
+      try {
+        // Simulate network delay
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        const result = `Async result: ${Math.random().toFixed(4)}`;
+        states.asyncResult = result;
+        states.loading = false;
+        return result;
+      } catch (error) {
+        states.loading = false;
+        throw error;
+      }
     }
   }),
   selectors: ({ states }) => ({
@@ -267,6 +286,79 @@ function SelectorsDisplay() {
 }
 
 // Batching Components
+function AsyncOperations() {
+  const renderCount = useRenderCounter();
+  const loading = testStore.use((state) => state.loading);
+  const asyncResult = testStore.use((state) => state.asyncResult);
+  const [promiseResult, setPromiseResult] = useState<string | null>(null);
+
+  const handleAsyncOperation = async () => {
+    try {
+      const result = await testStore.dispatch.simulateAsyncOperation();
+      setPromiseResult(result);
+    } catch (error) {
+      console.error('❌ Async operation failed:', error);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Async Button */}
+      <button
+        onClick={handleAsyncOperation}
+        disabled={loading}
+        className="w-full rounded bg-yellow-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-yellow-600 disabled:cursor-not-allowed disabled:bg-yellow-300"
+      >
+        {loading ? '⏳ Loading...' : '🚀 Start Async Operation'}
+      </button>
+
+      {/* Status Display */}
+      <div className="min-w-xs rounded border border-yellow-200 bg-yellow-50 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-yellow-800">
+            Async Status
+          </span>
+          <div className="flex items-center gap-2">
+            {loading && (
+              <div className="h-2 w-2 animate-pulse rounded-full bg-yellow-500"></div>
+            )}
+            <span className="text-xs text-yellow-600" suppressHydrationWarning>
+              Renders: {renderCount}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 text-xs">
+          <div className="flex justify-between">
+            <span className="text-yellow-700">Loading:</span>
+            <span
+              className={`rounded px-1 py-0.5 text-xs font-medium ${
+                loading
+                  ? 'bg-yellow-200 text-yellow-800'
+                  : 'bg-green-100 text-green-800'
+              }`}
+            >
+              {loading ? '🔄' : '✅'}
+            </span>
+          </div>
+          <div>
+            <span className="text-yellow-700">State Result:</span>
+            <div className="mt-1 max-w-full truncate rounded bg-yellow-100 px-2 py-1 font-mono text-yellow-900">
+              {asyncResult || 'None'}
+            </div>
+          </div>
+          <div>
+            <span className="text-yellow-700">Promise Result:</span>
+            <div className="mt-1 max-w-full truncate rounded bg-yellow-100 px-2 py-1 font-mono text-yellow-900">
+              {promiseResult || 'None'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BatchingActions() {
   const renderCount = useRenderCounter();
 
@@ -295,7 +387,7 @@ function BatchingActions() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-xs space-y-3">
       {/* Test Buttons */}
       <div className="flex gap-2">
         <button
@@ -464,6 +556,75 @@ function BatchingExample() {
   return (
     <PreviewFrame code={batchingCode} title="Batching vs Separate Operations">
       <BatchingActions />
+    </PreviewFrame>
+  );
+}
+
+export function AsyncTest() {
+  const asyncCode = `
+// Async Operations Demo
+const testStore = createStore({
+  states: {
+    counter: 0,
+    loading: false,
+    asyncResult: null as string | null
+  },
+  actions: ({ states, notify }) => ({
+    increment: () => { states.counter += 1; },
+    simulateAsyncOperation: async () => {
+      states.loading = true;
+      states.asyncResult = null;
+      notify(); // Trigger re-render immediately
+
+      try {
+        // Simulate network delay
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        const result = \`Async result: \${Math.random().toFixed(4)}\`;
+        states.asyncResult = result;
+        states.loading = false;
+        return result; // Return value from action
+      } catch (error) {
+        states.loading = false;
+        throw error;
+      }
+    }
+  })
+});
+
+// Usage - State vs Promise Result
+function AsyncExample() {
+  const renderCount = useRenderCounter();
+  const loading = testStore.use((state) => state.loading);
+  const asyncResult = testStore.use((state) => state.asyncResult);
+  const [promiseResult, setPromiseResult] = useState<string | null>(null);
+
+  const handleAsync = async () => {
+    try {
+      // Get result from promise return value
+      const result = await testStore.dispatch.simulateAsyncOperation();
+      setPromiseResult(result);
+    } catch (error) {
+      console.error('Failed:', error);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={handleAsync} disabled={loading}>
+        {loading ? '⏳ Loading...' : '🚀 Start Async'}
+      </button>
+      <div>Loading: {loading ? '🔄' : '✅'}</div>
+      <div>State Result: {asyncResult || 'None'}</div>
+      <div>Promise Result: {promiseResult || 'None'}</div>
+      <div>Renders: {renderCount}</div>
+    </div>
+  );
+}`;
+
+  return (
+    <PreviewFrame code={asyncCode} title="Async Operations">
+      <AsyncOperations />
     </PreviewFrame>
   );
 }
