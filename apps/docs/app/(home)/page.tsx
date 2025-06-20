@@ -1,13 +1,14 @@
 import Link from 'next/link';
 
 import { AsyncSection } from './components/ui/async-section';
+import { EventSystemSection } from './components/ui/event-system-section';
 import { HeroSection } from './components/ui/hero-section';
-import {
-  AsyncTest,
-  BasicStoreTest,
-  BatchingTest,
-  PerformanceTest
-} from './components/ui/store-test';
+// import {
+//   AsyncTest,
+//   BasicStoreTest,
+//   BatchingTest,
+//   PerformanceTest
+// } from './components/ui/store-test';
 import { ThreeWaySection } from './components/ui/three-way-section';
 
 export default function HomePage() {
@@ -17,8 +18,9 @@ export default function HomePage() {
 
       <ThreeWaySection />
       <AsyncSection />
+      <EventSystemSection />
 
-      <div className="mx-auto mt-20 grid w-full max-w-2xl gap-y-10">
+      {/* <div className="mx-auto mt-20 grid w-full max-w-2xl gap-y-10">
         <BasicStoreTest />
         <BatchingTest />
         <AsyncTest />
@@ -49,7 +51,7 @@ export default function HomePage() {
             subscriptions.
           </p>
         </div>
-      </div>
+      </div> */}
 
       <div className="mb-10 mt-20 text-center">
         <Link

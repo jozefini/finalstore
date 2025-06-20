@@ -12,20 +12,20 @@ type Actions = {
 }
 type Selectors = {
   isEven: () => boolean
-  isBiggerThan: (value: number) => boolean
+  isGreaterThan: (value: number) => boolean
 }
 
 const store = createStore<States, Actions, Selectors>({
   states: {
     count: 0,
   },
-  actions: ({ states }) => ({
+  actions: ({ states, selectors, trigger, notify }) => ({
     increment: () => { states.count += 1 },
     decrement: () => { states.count -= 1 },
   }),
-  selectors: ({ states }) => ({
+  selectors: ({ states, selectors }) => ({
     isEven: () => states.count % 2 === 0,
-    isBiggerThan: (value) => states.count > value,
+    isGreaterThan: (value) => states.count > value,
   }),
 })
 `;
