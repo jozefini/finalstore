@@ -750,11 +750,10 @@ export function createScopedStore<
   TEvents extends Record<string, unknown> = Record<string, unknown>
 >(props: StoreProps<TState, TActions, TSelectors, TEvents>) {
   type StoreType = InferStore<TState, TActions, TSelectors, TEvents>;
-  type ReactNode = React.ReactNode;
 
   const StoreContext = createContext<StoreType | null>(null);
 
-  const Provider = ({ children }: { children: ReactNode }) => {
+  const Provider = ({ children }: { children: React.ReactNode }) => {
     const store = useMemo(
       () => createStore<TState, TActions, TSelectors, TEvents>(props),
       []
@@ -767,7 +766,11 @@ export function createScopedStore<
       };
     }, [store]);
 
-    return createElement(StoreContext.Provider, { value: store }, children);
+    return createElement(
+      StoreContext.Provider,
+      { value: store },
+      children as any
+    );
   };
 
   function useStore(): StoreType {
