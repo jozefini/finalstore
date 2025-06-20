@@ -42,11 +42,11 @@ export function AsyncSection() {
       <div className="relative">
         <div className="mb-10 text-center">
           <h2 className="mb-4 text-4xl font-bold tracking-tight md:text-5xl">
-            Async Made Simple
+            Async Done Right
           </h2>
           <p className="text-fd-muted-foreground mx-auto max-w-2xl text-xl">
-            Handle complex async operations with confidence. Built-in loading
-            states, error handling, and automatic updates.
+            Write async actions that feel synchronous. Direct state mutations
+            with promise returns and instant UI updates.
           </p>
         </div>
 
@@ -75,7 +75,8 @@ export function AsyncSection() {
                   Seamless Async
                 </h3>
                 <p className="text-fd-muted-foreground text-sm leading-relaxed lg:text-base">
-                  Super simple async actions. No thunks, no sagas, no headaches.
+                  No reducers, no middleware, no complexity. Just write async
+                  like you think.
                 </p>
               </div>
             </div>

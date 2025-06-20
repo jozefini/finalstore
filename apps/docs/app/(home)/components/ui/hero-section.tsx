@@ -5,7 +5,7 @@ export function HeroSection() {
   return (
     <div className="mx-auto max-w-4xl text-center">
       <div className="border-fd-border/50 bg-fd-background/50 text-fd-muted-foreground mb-6 inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
-        ⚡ Optimized updates • Type-safe • Lightweight
+        ⚡ Easy to learn • Built-in async • TypeScript first
       </div>
 
       <h1 className="mb-6 text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl lg:!text-6xl">
@@ -17,8 +17,8 @@ export function HeroSection() {
       </h1>
 
       <p className="text-fd-muted-foreground mx-auto mb-8 max-w-2xl text-xl sm:text-2xl">
-        Global or scoped stores. Direct mutations. Auto-memoized selectors.
-        DevTools ready.
+        Write state like variables, get reactivity like magic. Global or scoped,
+        sync or async - just works.
       </p>
 
       <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
