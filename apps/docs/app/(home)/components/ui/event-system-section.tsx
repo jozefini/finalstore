@@ -8,11 +8,9 @@ type States = {
 }
 type Actions = {
   addToCart: (item: CartItem) => void
-  removeFromCart: (id: string) => void
 }
 type Events = {
-  itemAdded: CartItem
-  itemRemoved: CartItem
+  'cart.items.added': CartItem
 }
 
 const cartStore = createStore<States, Actions, {}, Events>({
@@ -24,30 +22,20 @@ const cartStore = createStore<States, Actions, {}, Events>({
       const foundItem = states.cart.find(i => i.id === item.id)
       if (!foundItem) {
         states.cart.push(item)
-        trigger('itemAdded', item)
-      }
-    },
-    removeFromCart(id) {
-      const foundItem = states.cart.find(i => i.id === id)
-      if (foundItem) {
-        states.cart = states.cart.filter(i => i.id !== id)
-        trigger('itemRemoved', id)
+        trigger('cart.items.added', item) // Trigger event on success
       }
     }
   })
 })
 
-// Listen to events for side effects
-const addedListener = cartStore.on('itemAdded', (item) => {
-  track('Item Added', { productId: item.id, price: item.price })
-})
-const removedListener = cartStore.on('itemRemoved', (id) => {
-  track('Item Removed', { productId: id })
-})
-
-// Cleanup when component unmounts
-addedListener.off()
-removedListener.off()
+useEffect(() => {
+  const listener = cartStore.on('cart.items.added', (item) => {
+    track('Item Added', { productId: item.id, price: item.price })
+  })
+  return () => {
+    listener.off() // Cleanup when component unmounts
+  }
+}, [])
 `;
 
 export function EventSystemSection() {
