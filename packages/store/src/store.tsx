@@ -330,6 +330,131 @@ export function createStore<
   let stateVersion = 0;
   let suppressProxyNotifications = false; // Flag to suppress notifications during sync actions
 
+  // Global selector cache system for performance optimization
+  type SelectorCacheEntry = {
+    result: any;
+    stateVersion: number;
+    lastUsed: number;
+    computeCount: number; // For debugging
+  };
+
+  const globalSelectorCache = new Map<string, SelectorCacheEntry>();
+  const activeSelectorKeys = new Set<string>(); // Track which selectors are actively used
+
+  // Cache key generation for selectors with arguments
+  function createSelectorCacheKey(selectorName: string, args: any[]): string {
+    if (args.length === 0) return selectorName;
+
+    try {
+      // Use JSON.stringify for simple serializable arguments
+      const argsHash = JSON.stringify(args);
+      return `${selectorName}:${argsHash}`;
+    } catch {
+      // Fallback for non-serializable arguments - generate unique key
+      const fallbackHash = args.map((arg, i) => `${i}:${typeof arg}`).join(',');
+      return `${selectorName}:fallback:${fallbackHash}:${Date.now()}`;
+    }
+  }
+
+  // Pre-compute all active selectors when state changes
+  function updateGlobalSelectorCaches() {
+    const currentStateVersion = stateVersion;
+    const currentState = getState();
+    let updatedCount = 0;
+
+    for (const cacheKey of activeSelectorKeys) {
+      const cached = globalSelectorCache.get(cacheKey);
+
+      // Only update if state version changed or cache doesn't exist
+      if (!cached || cached.stateVersion !== currentStateVersion) {
+        try {
+          // Parse selector name and arguments from cache key
+          const colonIndex = cacheKey.indexOf(':');
+          const selectorName =
+            colonIndex === -1 ? cacheKey : cacheKey.substring(0, colonIndex);
+
+          if (selectors[selectorName as keyof TSelectors]) {
+            let args: any[] = [];
+
+            if (colonIndex !== -1) {
+              const argsStr = cacheKey.substring(colonIndex + 1);
+              if (!argsStr.startsWith('fallback:')) {
+                try {
+                  args = JSON.parse(argsStr);
+                } catch {
+                  // Skip invalid cache entries
+                  continue;
+                }
+              }
+            }
+
+            // Re-compute selector with current state
+            const newResult = (
+              selectors[selectorName as keyof TSelectors] as any
+            )(...args);
+
+            globalSelectorCache.set(cacheKey, {
+              result: newResult,
+              stateVersion: currentStateVersion,
+              lastUsed: Date.now(),
+              computeCount: (cached?.computeCount || 0) + 1
+            });
+
+            updatedCount++;
+          }
+        } catch (error) {
+          // Remove invalid cache entries
+          globalSelectorCache.delete(cacheKey);
+          activeSelectorKeys.delete(cacheKey);
+        }
+      }
+    }
+
+    // Optional: Log performance info in development
+    if (typeof window !== 'undefined' && (window as any).__STORE_DEBUG__) {
+      console.log(
+        `🔄 Updated ${updatedCount} selector caches for state version ${currentStateVersion}`
+      );
+    }
+  }
+
+  // Cache cleanup to prevent memory leaks
+  function cleanupSelectorCache() {
+    const cutoff = Date.now() - 300000; // 5 minutes
+    let cleanedCount = 0;
+
+    for (const [cacheKey, entry] of globalSelectorCache.entries()) {
+      if (entry.lastUsed < cutoff) {
+        globalSelectorCache.delete(cacheKey);
+        activeSelectorKeys.delete(cacheKey);
+        cleanedCount++;
+      }
+    }
+
+    // Optional: Log cleanup info in development
+    if (
+      typeof window !== 'undefined' &&
+      (window as any).__STORE_DEBUG__ &&
+      cleanedCount > 0
+    ) {
+      console.log(
+        `🧹 Cleaned up ${cleanedCount} unused selector cache entries`
+      );
+    }
+  }
+
+  // Periodic cleanup (only in browser environment)
+  if (typeof window !== 'undefined') {
+    const cleanupInterval = setInterval(cleanupSelectorCache, 60000); // Every minute
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      clearInterval(cleanupInterval);
+      globalSelectorCache.clear();
+      activeSelectorKeys.clear();
+    });
+  }
+
   // Create event map
   const events: EventMap = new Map();
 
@@ -558,6 +683,10 @@ export function createStore<
   }
 
   function notifySubscribers() {
+    // CRITICAL: Update all selector caches FIRST before notifying subscribers
+    // This ensures all predefined selectors run only once per state change
+    updateGlobalSelectorCaches();
+
     const currentState = getState();
 
     // Use for-of loop directly on Map.values() for better performance
@@ -751,13 +880,28 @@ export function createStore<
     (acc, key) => {
       // Create a wrapper function that calls the original selector
       acc[key] = function (...args: any) {
-        // Convert the predefined selector to a regular state selector
-        // for use with the memoization system
-        const wrappedSelector = (_state: TState) => {
-          return (selectors[key as keyof TSelectors] as any)(...args);
-        };
+        const cacheKey = createSelectorCacheKey(key, args);
 
-        return get(wrappedSelector);
+        // Check global cache first for performance
+        const cached = globalSelectorCache.get(cacheKey);
+        if (cached && cached.stateVersion === stateVersion) {
+          cached.lastUsed = Date.now();
+          return cached.result;
+        }
+
+        // Fallback to direct computation and cache the result
+        const result = (selectors[key as keyof TSelectors] as any)(...args);
+
+        globalSelectorCache.set(cacheKey, {
+          result,
+          stateVersion,
+          lastUsed: Date.now(),
+          computeCount: (cached?.computeCount || 0) + 1
+        });
+
+        activeSelectorKeys.add(cacheKey);
+
+        return result;
       };
 
       return acc;
@@ -829,10 +973,31 @@ export function createStore<
     (acc, key) => {
       // Create a wrapper function that calls the original selector
       acc[key] = function (...args: any) {
-        // Convert the predefined selector to a regular state selector
-        // for use with the subscription system
+        const cacheKey = createSelectorCacheKey(key, args);
+
+        // Register this selector as actively used for pre-computation
+        activeSelectorKeys.add(cacheKey);
+
+        // Create a wrapper that uses the global cache when possible
         const wrappedSelector = (_state: TState) => {
-          return (selectors[key as keyof TSelectors] as any)(...args);
+          // Check global cache first (should be pre-computed by notifySubscribers)
+          const cached = globalSelectorCache.get(cacheKey);
+          if (cached && cached.stateVersion === stateVersion) {
+            cached.lastUsed = Date.now();
+            return cached.result;
+          }
+
+          // Fallback computation if cache miss (shouldn't happen often)
+          const result = (selectors[key as keyof TSelectors] as any)(...args);
+
+          globalSelectorCache.set(cacheKey, {
+            result,
+            stateVersion,
+            lastUsed: Date.now(),
+            computeCount: (cached?.computeCount || 0) + 1
+          });
+
+          return result;
         };
 
         return use(wrappedSelector);
