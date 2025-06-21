@@ -16,7 +16,7 @@ import {
 /* eslint-disable-next-line */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-type AnyType = any;
+export type AnyType = any;
 type ActionsContext<TState, TActions, TSelectors, TEvents> = (store: {
   states: TState;
   actions: TActions;

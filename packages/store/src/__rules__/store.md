@@ -168,12 +168,12 @@ const store = createStore<States, Actions, {}, Events>({
 });
 
 // Listen to events
-store.on('analytics', 'userLoggedIn', (user) => {
+const userLoginListener = store.on('userLoggedIn', (user) => {
   track('User Login', { userId: user.id });
 });
 
 // Remove listener
-store.off('analytics');
+userLoginListener.off();
 ```
 
 ## Reactive Access - `use()`
@@ -599,15 +599,18 @@ const handleFetch = async () => {
 
 ```tsx
 // Listen to all errors
-store.on('errorHandler', 'error', (error) => {
+const errorListener = store.on('error', (error) => {
   console.error('Store error:', error);
   // Send to error reporting service
 });
+
+// Cleanup when no longer needed
+errorListener.off();
 ```
 
 ## Best Practices
 
-1. **Always use explicit types** - `createStore<States, Actions, Selectors>()`
+1. **Always use explicit types** - `createStore<States, Actions, Selectors, Events>()`
 2. **Define initial state with types** - `count: 0 as number`
 3. **Use initial state in reset** - Safe due to `deepClone`
 4. **Batch multiple updates** - Single re-render
