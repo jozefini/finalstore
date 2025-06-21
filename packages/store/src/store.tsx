@@ -165,6 +165,69 @@ const createBatcher = () => {
 
 // HELPERS:
 
+function createReactiveProxy<T>(
+  obj: T,
+  onMutate?: (
+    target: any,
+    key: string | symbol,
+    newVal: any,
+    oldVal: any
+  ) => void
+): T {
+  const proxyCache = new WeakMap();
+
+  function wrap(value: any): any {
+    if (typeof value !== 'object' || value === null) return value;
+
+    // Already proxied?
+    if (proxyCache.has(value)) return proxyCache.get(value);
+
+    // Don't proxy certain built-in objects and special collections
+    if (
+      value instanceof Date ||
+      value instanceof RegExp ||
+      value instanceof Error ||
+      value instanceof Map ||
+      value instanceof Set ||
+      value instanceof WeakMap ||
+      value instanceof WeakSet ||
+      ArrayBuffer.isView(value)
+    ) {
+      return value;
+    }
+
+    const proxy = new Proxy(value, {
+      get(target, key, receiver) {
+        const result = Reflect.get(target, key, receiver);
+        // Only wrap the result if it's not a function (to avoid breaking methods)
+        return typeof result === 'function' ? result : wrap(result);
+      },
+      set(target, key, newValue, receiver) {
+        const oldValue = target[key];
+        const result = Reflect.set(target, key, newValue, receiver);
+        if (oldValue !== newValue && onMutate) {
+          onMutate(target, key, newValue, oldValue);
+        }
+        return result;
+      },
+      deleteProperty(target, key) {
+        const hadKey = Object.prototype.hasOwnProperty.call(target, key);
+        const oldValue = hadKey ? target[key] : undefined;
+        const result = Reflect.deleteProperty(target, key);
+        if (hadKey && onMutate) {
+          onMutate(target, key, undefined, oldValue);
+        }
+        return result;
+      }
+    });
+
+    proxyCache.set(value, proxy);
+    return proxy;
+  }
+
+  return wrap(obj);
+}
+
 export function deepClone<T>(obj: T): T {
   // Handle primitive types, null, and undefined
   if (obj === null || typeof obj !== 'object') {
@@ -261,11 +324,11 @@ export function createStore<
   props: StoreProps<TState, TActions, TSelectors, TEvents>
 ): InferStore<TState, TActions, TSelectors, TEvents> {
   const initialStates = deepClone(props.states);
-  let states = deepClone(initialStates);
+  const states = deepClone(initialStates);
 
   // State change tracking for optimization
-  let stateChanged = false;
   let stateVersion = 0;
+  let suppressProxyNotifications = false; // Flag to suppress notifications during sync actions
 
   // Create event map
   const events: EventMap = new Map();
@@ -279,16 +342,19 @@ export function createStore<
     isBatching
   } = createBatcher();
 
-  // Create a proxy for states that always points to the current value
-  const statesProxy = new Proxy({} as TState, {
-    get: (_target, prop) => {
-      return states[prop as keyof TState];
-    },
-    set: (_target, prop, value) => {
-      states[prop as keyof TState] = value;
-      return true;
+  // Create a deep reactive proxy that detects all mutations (permanent, not recreated)
+  const statesProxy = createReactiveProxy(
+    states,
+    (target, key, newValue, oldValue) => {
+      // Increment state version when any mutation occurs (for cache invalidation)
+      stateVersion++;
+
+      // For async mutations, notify immediately (unless explicitly suppressed)
+      if (!suppressProxyNotifications) {
+        scheduleNotification();
+      }
     }
-  });
+  );
 
   // DevTools setup
   let devTools: DevTools | null = null;
@@ -328,7 +394,10 @@ export function createStore<
               try {
                 const newState = JSON.parse(message.state || '{}');
                 pauseDevTools = true;
-                states = newState;
+                // Update state in place to maintain proxy reference
+                Object.keys(states).forEach((key) => delete states[key]);
+                Object.assign(states, newState);
+                stateVersion++;
                 notifySubscribers();
                 pauseDevTools = false;
               } catch (error) {
@@ -390,10 +459,8 @@ export function createStore<
         trigger,
         notify: () => {
           // Force immediate notification for async operations
-          // Clone state to ensure reference changes are detected
-          states = deepClone(states);
+          // Increment state version to bust selector cache and force immediate updates
           stateVersion++;
-          // Call notifySubscribers directly for immediate updates
           notifySubscribers();
         }
       })
@@ -417,6 +484,7 @@ export function createStore<
       callback: () => void;
       lastValue: unknown;
       memoizedSelector?: (state: TState) => unknown;
+      lastStateVersion?: number; // Track state version for whole state subscriptions
     }
   >();
   let nextSubscriberId = 0;
@@ -469,7 +537,8 @@ export function createStore<
       selector: initialSelector,
       memoizedSelector,
       callback,
-      lastValue: initialValue
+      lastValue: initialValue,
+      lastStateVersion: shouldMemoize ? undefined : stateVersion // Track version for whole state subs
     });
 
     return () => {
@@ -496,11 +565,16 @@ export function createStore<
       const selector = sub.memoizedSelector || sub.selector;
       const newValue = selector(currentState);
 
-      // For entire store subscriptions (no memoized selector), use reference equality
-      // For specific selectors, use deep equality
-      const hasChanged = sub.memoizedSelector
-        ? !isDeepEqual(newValue, sub.lastValue)
-        : newValue !== sub.lastValue;
+      let hasChanged = false;
+
+      if (sub.memoizedSelector) {
+        // For specific selectors, use deep equality
+        hasChanged = !isDeepEqual(newValue, sub.lastValue);
+      } else {
+        // For entire store subscriptions, use stateVersion tracking
+        hasChanged = sub.lastStateVersion !== stateVersion;
+        sub.lastStateVersion = stateVersion;
+      }
 
       if (hasChanged) {
         sub.lastValue = newValue;
@@ -546,46 +620,44 @@ export function createStore<
         const cb = actions[actionKey];
         const actionInfo = { type: String(actionKey), payload: args };
 
+        // Suppress proxy notifications during sync action execution
+        suppressProxyNotifications = true;
+
         // Execute the action with all arguments
         const result = (cb as any)(...args);
 
-        // Always mark as changed when action runs (safe approach for all mutations)
-        stateChanged = true;
+        // For sync actions, update state object in place to maintain proxy reference
+        // For async actions, let the deep proxy handle everything
+        if (!isBatching() && !(result instanceof Promise)) {
+          const clonedState = deepClone(states);
+          // Clear and update the existing states object instead of reassigning
+          Object.keys(states).forEach((key) => delete states[key]);
+          Object.assign(states, clonedState);
+          stateVersion++;
+        }
 
-        // Only clone state if not batching (optimization)
-        if (!isBatching()) {
-          states = deepClone(states);
-          stateVersion++; // Increment version for cache invalidation
+        // Re-enable proxy notifications after sync action completes
+        if (!(result instanceof Promise)) {
+          suppressProxyNotifications = false;
+        } else {
+          // For async actions, re-enable immediately so proxy can handle async mutations
+          suppressProxyNotifications = false;
         }
 
         if (result instanceof Promise) {
           // For async actions, handle the promise properly
           return result
             .then((finalResult) => {
-              // For async actions, always clone and notify since they complete outside the original action context
-              states = deepClone(states);
-              stateVersion++;
-
-              // Use optimized DevTools scheduling
+              // Deep proxy handles notifications automatically - just handle DevTools
               scheduleDevTools(actionInfo);
-
-              // Always notify after async completion
-              scheduleNotification();
               return finalResult;
             })
             .catch((error) => {
-              // Also handle errors - clone state and notify
-              states = deepClone(states);
-              stateVersion++;
-
-              // Use optimized DevTools scheduling
+              // Deep proxy handles notifications automatically - just handle DevTools
               scheduleDevTools({
                 type: `${actionInfo.type}_ERROR`,
                 payload: { ...actionInfo.payload, error: error.message }
               });
-
-              // Always notify after async error
-              scheduleNotification();
               throw error;
             });
         }
@@ -616,8 +688,10 @@ export function createStore<
     batch(
       () => {
         callback();
-        // Clone state once at the end of batch (optimization)
-        states = deepClone(states);
+        // Update state in place at the end of batch to maintain proxy reference
+        const clonedState = deepClone(states);
+        Object.keys(states).forEach((key) => delete states[key]);
+        Object.assign(states, clonedState);
         stateVersion++;
       },
       () => {
@@ -643,9 +717,11 @@ export function createStore<
 
   // Reset function
   function reset() {
-    const prevStates = states;
-    states = deepClone(initialStates);
-    stateChanged = true;
+    const prevStates = deepClone(states);
+    const resetState = deepClone(initialStates);
+    // Update state in place to maintain proxy reference
+    Object.keys(states).forEach((key) => delete states[key]);
+    Object.assign(states, resetState);
     stateVersion++;
     events.clear(); // Clear all events on reset
 
@@ -696,7 +772,7 @@ export function createStore<
   function use<T>(selector: (state: TState) => T): T;
   function use<T extends unknown[]>(selector: (state: TState) => T): T;
   function use<T>(selector?: (state: TState) => T): TState | T {
-    const stateRef = useRef(getState());
+    const stateVersionRef = useRef(stateVersion);
     const selectorRef = useRef(selector);
 
     // Memoize the selector function to prevent unnecessary recalculations
@@ -712,10 +788,10 @@ export function createStore<
     // Update references if selector changes
     if (selector !== selectorRef.current) {
       selectorRef.current = selector;
-      stateRef.current = getState();
+      stateVersionRef.current = stateVersion;
       valueRef.current = memoizedSelector
-        ? (memoizedSelector(stateRef.current) as T | TState)
-        : stateRef.current;
+        ? (memoizedSelector(getState()) as T | TState)
+        : getState();
     }
 
     const subscribeFn = useCallback(
@@ -726,14 +802,20 @@ export function createStore<
     );
 
     const getSnapshot = useCallback(() => {
-      const currentState = getState();
-      const hasStateChanged = currentState !== stateRef.current;
+      const currentStateVersion = stateVersion;
+      const hasStateChanged = currentStateVersion !== stateVersionRef.current;
 
       if (hasStateChanged || !valueRef.current) {
-        stateRef.current = currentState;
-        valueRef.current = memoizedSelector
-          ? (memoizedSelector(currentState) as T | TState)
-          : currentState;
+        stateVersionRef.current = currentStateVersion;
+        const currentState = getState();
+
+        if (memoizedSelector) {
+          // For selectors, use the memoized result
+          valueRef.current = memoizedSelector(currentState) as T | TState;
+        } else {
+          // For whole state, create a new object to ensure React detects the change
+          valueRef.current = { ...currentState } as T | TState;
+        }
       }
 
       return valueRef.current;

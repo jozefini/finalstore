@@ -85,10 +85,8 @@ const userStore = createStore<UserStates, UserActions>({
 });
 
 function AsyncDemo() {
-  // const loading = userStore.use((state) => state.loading);
-  // const error = userStore.use((state) => state.error);
-  // const user = userStore.use((state) => state.user);
   const { user, loading, error } = userStore.use();
+
   const handleFetchUser = async (id: string) => {
     try {
       await userStore.dispatch.fetchUser(id);

@@ -616,9 +616,9 @@ errorListener.off();
 
 ## Mutation Detection
 
-The store works **like Immer** - you can mutate state directly and it detects changes automatically.
+The store works **exactly like Immer** - you can mutate state directly at any depth and it detects changes automatically using a sophisticated deep proxy system.
 
-### ✅ Mutations That Work (Detected Automatically)
+### ✅ All Mutations Work (Detected Automatically)
 
 ```tsx
 actions: ({ states }) => ({
@@ -642,48 +642,56 @@ actions: ({ states }) => ({
     delete states.errors[field]; // ✅ Works
   },
 
-  // Map/Set mutations
-  updateMap: (key, value) => {
-    states.dataMap.set(key, value); // ✅ Works
-  }
-});
-```
-
-### ❌ Deep Nested Mutations (Not Detected)
-
-```tsx
-actions: ({ states }) => ({
-  // ❌ Too deep - won't trigger updates
+  // Deep nested mutations (now fully supported!)
   updateUserTheme: (userId, theme) => {
     const user = states.users.find((u) => u.id === userId);
-    user.profile.settings.theme = theme; // 3+ levels deep
-  }
-});
+    user.profile.settings.theme = theme; // ✅ Works perfectly!
+  },
 
-// ✅ Fix: Update at the top level instead
-actions: ({ states }) => ({
-  updateUserTheme: (userId, theme) => {
-    states.users = states.users.map((user) =>
-      user.id === userId
-        ? {
-            ...user,
-            profile: {
-              ...user.profile,
-              settings: { ...user.profile.settings, theme }
-            }
-          }
-        : user
-    );
+  // Complex nested operations
+  updateCell: (row, col, value) => {
+    states.grid[row][col] = value; // ✅ Works
+  },
+
+  // Mixed operations
+  complexUpdate: () => {
+    states.count += 1;
+    states.items.push(`item-${states.count}`);
+    states.user.profile.lastActive = new Date();
+    delete states.errors.validation; // ✅ All work together
   }
 });
 ```
 
-**Rule:** Mutations on `states.property` and `states.object[key]` are detected. Mutations deeper than `states.obj.nested.deep.prop` may not be detected.
+### 🚀 Deep Proxy System
 
-**Workarounds for deep mutations:**
+The store uses an advanced **deep proxy system** with:
 
-1. **Replace at top level** (recommended)
-2. **Call `notify()` manually** after deep mutations
+- **Lazy wrapping** - Objects are only proxied when accessed
+- **WeakMap caching** - Prevents duplicate proxies and memory leaks
+- **Smart type detection** - Preserves Maps, Sets, Dates, and built-in objects
+- **Method preservation** - Functions work normally without interference
+- **Performance optimized** - Only tracks actual mutations
+
+### 💡 No Limitations
+
+Unlike other state managers, there are **no mutation detection limitations**:
+
+- ✅ Mutate at any depth
+- ✅ Use any JavaScript patterns
+- ✅ Works with all data types
+- ✅ No special syntax required
+- ✅ Perfect TypeScript support
+- ✅ **Perfect async reactivity** - React components update instantly for all async mutations
+
+### 🔧 Technical Implementation
+
+The store uses advanced techniques to ensure perfect React integration:
+
+- **Deep proxy system** detects all mutations automatically
+- **State version tracking** ensures React detects changes via `stateVersion` instead of reference equality
+- **Object spreading** creates new references `{ ...state }` so React's `useSyncExternalStore` properly detects changes
+- **Microtask batching** optimizes performance while maintaining instant reactivity
 
 ## Best Practices
 

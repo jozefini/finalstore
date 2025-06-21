@@ -639,4 +639,52 @@ describe('Performance and Edge Case Tests', () => {
       expect(store.get.dynamicKeys()).toEqual([]);
     });
   });
+
+  describe('Async Notification Tests', () => {
+    it('should handle async mutations with deep proxy notifications', async () => {
+      // This tests that the deep proxy system properly notifies on async mutations
+      const store = createStore({
+        states: {
+          data: null as string | null,
+          loading: false,
+          user: {
+            id: 0,
+            profile: {
+              settings: {
+                theme: 'light'
+              }
+            }
+          }
+        },
+        actions: ({ states, notify }) => ({
+          async fetchUserData() {
+            states.loading = true;
+            notify(); // Force immediate notification for loading state
+
+            // Simulate async API call
+            await new Promise((resolve) => setTimeout(resolve, 5));
+
+            // These mutations should trigger notifications automatically via proxy
+            states.data = 'user data loaded';
+            states.user.id = 123;
+            states.user.profile.settings.theme = 'dark';
+            states.loading = false;
+
+            return states.data;
+          }
+        })
+      });
+
+      // Test that async mutations work and final state is correct
+      const result = await store.dispatch.fetchUserData();
+
+      expect(result).toBe('user data loaded');
+      expect(store.get((state) => state.loading)).toBe(false);
+      expect(store.get((state) => state.data)).toBe('user data loaded');
+      expect(store.get((state) => state.user.id)).toBe(123);
+      expect(store.get((state) => state.user.profile.settings.theme)).toBe(
+        'dark'
+      );
+    });
+  });
 });

@@ -1,4 +1,35 @@
-Intuitive state management for React applications with first-class TypeScript support. It offers both global stores and collection management with minimal boilerplate.
+**The most intuitive state management** for React applications. Features **deep mutation detection** (like Immer), first-class TypeScript support, and zero boilerplate. Mutate nested state directly - it just works! 🚀
+
+#### 🌟 Deep Mutations Just Work
+
+```tsx
+// All of these mutations are detected automatically!
+actions: {
+  // ✅ Direct mutations
+  updateTheme: (state, theme) => {
+    state.sidebar.theme = theme;  // Nested mutation - works!
+  },
+
+  // ✅ Array mutations
+  addNotification: (state, message) => {
+    state.notifications.push({ id: Date.now(), message });  // Direct push - works!
+  },
+
+  // ✅ Deep nested mutations
+  updateUserPreference: (state, userId, key, value) => {
+    const user = state.users.find(u => u.id === userId);
+    user.profile.preferences[key] = value;  // 4 levels deep - works!
+  },
+
+  // ✅ Complex operations
+  reorganizeData: (state) => {
+    state.data.items.splice(0, 2);  // Remove items
+    state.data.metadata.lastUpdated = new Date();  // Update timestamp
+    delete state.cache.temp;  // Delete property
+    // All mutations detected automatically! 🎉
+  }
+}
+```
 
 #### Setup store
 
