@@ -255,7 +255,7 @@ describe('React Integration - Core Functionality', () => {
       expect(duration).toBeLessThan(100); // Should be fast
     });
 
-    it.skip('should handle large state efficiently (known limitation)', () => {
+    it('should handle large state efficiently', () => {
       const largeState = {
         items: Array.from({ length: 1000 }, (_, i) => ({
           id: i,
@@ -268,7 +268,7 @@ describe('React Integration - Core Functionality', () => {
         states: largeState,
         actions: ({ states }) => ({
           updateItem: (id: number, value: string) => {
-            // Store-friendly way: replace the entire item
+            // ✅ Correct pattern: Replace the entire array to create new reference
             states.items = states.items.map((item) =>
               item.id === id ? { ...item, value } : item
             );

@@ -575,7 +575,7 @@ describe('Store Core Functionality', () => {
       await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
 
       expect(mockDevTools.send).toHaveBeenCalledWith(
-        { type: 'increment', payload: undefined },
+        { type: 'increment', payload: [] },
         { count: 1 }
       );
     });
@@ -611,9 +611,9 @@ describe('Store Core Functionality', () => {
         {
           type: 'MICROTASK_BATCH',
           payload: [
-            { type: 'increment', payload: undefined },
-            { type: 'increment', payload: undefined },
-            { type: 'increment', payload: undefined }
+            { type: 'increment', payload: [] },
+            { type: 'increment', payload: [] },
+            { type: 'increment', payload: [] }
           ]
         },
         { count: 3 }

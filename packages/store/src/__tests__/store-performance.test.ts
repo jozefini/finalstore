@@ -52,7 +52,7 @@ describe('Performance and Edge Case Tests', () => {
       expect(duration).toBeLessThan(100); // Should be fast
     });
 
-    it.skip('should handle deep nested objects efficiently (known limitation)', () => {
+    it('should handle deep nested objects efficiently', () => {
       // Simplified realistic deep object test
       const store = createStore({
         states: {
@@ -66,20 +66,18 @@ describe('Performance and Edge Case Tests', () => {
         },
         actions: ({ states }) => ({
           updateUserTheme: (id: number, theme: string) => {
-            // Store-friendly way: replace the entire user object
-            const userIndex = states.users.findIndex((u) => u.id === id);
-            if (userIndex !== -1) {
-              states.users[userIndex] = {
-                ...states.users[userIndex],
-                profile: {
-                  ...states.users[userIndex].profile,
-                  settings: {
-                    ...states.users[userIndex].profile.settings,
-                    theme
+            // ✅ Correct pattern: Replace the entire array to create new reference
+            states.users = states.users.map((user) =>
+              user.id === id
+                ? {
+                    ...user,
+                    profile: {
+                      ...user.profile,
+                      settings: { ...user.profile.settings, theme }
+                    }
                   }
-                }
-              };
-            }
+                : user
+            );
           }
         }),
         selectors: ({ states }) => ({
@@ -174,7 +172,7 @@ describe('Performance and Edge Case Tests', () => {
   });
 
   describe('Error Handling Edge Cases', () => {
-    it.skip('should handle deep object references without circular cloning issues (known limitation)', () => {
+    it('should handle deep object references without circular cloning issues', () => {
       // Simplified realistic deep structure test
       const store = createStore({
         states: {
@@ -535,7 +533,7 @@ describe('Performance and Edge Case Tests', () => {
   });
 
   describe('State Mutation Edge Cases', () => {
-    it.skip('should handle complex array mutations (known limitation)', () => {
+    it('should handle complex array mutations', () => {
       // Simplified to use store-friendly mutation patterns
       const store = createStore({
         states: {
@@ -547,7 +545,7 @@ describe('Performance and Edge Case Tests', () => {
         },
         actions: ({ states }) => ({
           updateCell: (row: number, col: number, value: number) => {
-            // Store-friendly way: replace the entire row
+            // ✅ Correct pattern: Replace the entire row to create new reference
             const newMatrix = [...states.matrix];
             newMatrix[row] = [...newMatrix[row]];
             newMatrix[row][col] = value;

@@ -608,15 +608,61 @@ const errorListener = store.on('error', (error) => {
 errorListener.off();
 ```
 
+## Design Limitations
+
+### Deep Mutation Detection
+
+The store is **designed for immutable patterns** and has a known limitation with deep mutations:
+
+```tsx
+// ❌ Won't trigger updates - deep mutations not detected
+actions: ({ states }) => ({
+  updateUserTheme: (userId, theme) => {
+    const user = states.users.find((u) => u.id === userId);
+    user.profile.settings.theme = theme; // Deep mutation - not detected
+  }
+});
+
+// ✅ Correct pattern - creates new references
+actions: ({ states }) => ({
+  updateUserTheme: (userId, theme) => {
+    states.users = states.users.map((user) =>
+      user.id === userId
+        ? {
+            ...user,
+            profile: {
+              ...user.profile,
+              settings: { ...user.profile.settings, theme }
+            }
+          }
+        : user
+    );
+  }
+});
+```
+
+**Why this limitation exists:**
+
+- **Performance** - Deep mutation detection would require complex proxy systems
+- **Compatibility** - Would break Maps, Sets, Dates, and other objects
+- **Simplicity** - Immutable patterns are more predictable and debuggable
+
+**Workarounds:**
+
+1. **Use immutable patterns** (recommended)
+2. **Call `notify()` manually** after deep mutations
+3. **Clone and reassign** the top-level property
+
 ## Best Practices
 
 1. **Always use explicit types** - `createStore<States, Actions, Selectors, Events>()`
 2. **Define initial state with types** - `count: 0 as number`
-3. **Use initial state in reset** - Safe due to `deepClone`
-4. **Batch multiple updates** - Single re-render
-5. **Use selectors for computed values** - Automatic memoization
-6. **Handle async with notify()** - Immediate loading states
-7. **Use events for side effects** - Keep actions pure
-8. **Enable devtools in development**
-9. **Optimize selectors** - Select only what you need
-10. **Test stores easily** - Just functions and objects
+3. **Use immutable patterns** - Replace objects/arrays instead of mutating
+4. **Use initial state in reset** - Safe due to `deepClone`
+5. **Batch multiple updates** - Single re-render
+6. **Use selectors for computed values** - Automatic memoization
+7. **Handle async with notify()** - Immediate loading states
+8. **Use events for side effects** - Keep actions pure
+9. **Enable devtools in development**
+10. **Optimize selectors** - Select only what you need
+11. **Test stores easily** - Just functions and objects

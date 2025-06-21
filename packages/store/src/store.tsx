@@ -542,12 +542,12 @@ export function createStore<
   // Create dispatch functions
   const createDispatchObject = () =>
     Object.keys(actions).reduce((acc, actionKey) => {
-      acc[actionKey] = (payload?: AnyType) => {
+      acc[actionKey] = (...args: AnyType[]) => {
         const cb = actions[actionKey];
-        const actionInfo = { type: String(actionKey), payload };
+        const actionInfo = { type: String(actionKey), payload: args };
 
-        // Execute the action
-        const result = cb(payload);
+        // Execute the action with all arguments
+        const result = (cb as any)(...args);
 
         // Always mark as changed when action runs (safe approach for all mutations)
         stateChanged = true;
