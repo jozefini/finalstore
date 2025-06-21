@@ -93,8 +93,10 @@ const store = createStore<States, Actions>({
     },
 
     updateItem: (id: string, data: Partial<Item>) => {
-      const item = states.items.find((i) => i.id === id);
-      if (item) Object.assign(item, data);
+      // ✅ Reliable: Replace entire array with updated item
+      states.items = states.items.map((item) =>
+        item.id === id ? { ...item, ...data } : item
+      );
     }
   })
 });
@@ -513,15 +515,19 @@ const actions = ({ states }) => ({
 ```tsx
 const actions = ({ states }) => ({
   addItem: (item: Item) => {
-    states.items.push(item);
+    // ✅ Reliable: Replace entire array
+    states.items = [...states.items, item];
   },
 
   updateItem: (id: string, updates: Partial<Item>) => {
-    const item = states.items.find((i) => i.id === id);
-    if (item) Object.assign(item, updates);
+    // ✅ Reliable: Replace entire array with updated item
+    states.items = states.items.map((item) =>
+      item.id === id ? { ...item, ...updates } : item
+    );
   },
 
   removeItem: (id: string) => {
+    // ✅ Already correct: Replace entire array
     states.items = states.items.filter((i) => i.id !== id);
   }
 });
@@ -608,22 +614,53 @@ const errorListener = store.on('error', (error) => {
 errorListener.off();
 ```
 
-## Design Limitations
+## Mutation Detection
 
-### Deep Mutation Detection
+The store works **like Immer** - you can mutate state directly and it detects changes automatically.
 
-The store is **designed for immutable patterns** and has a known limitation with deep mutations:
+### ✅ Mutations That Work (Detected Automatically)
 
 ```tsx
-// ❌ Won't trigger updates - deep mutations not detected
 actions: ({ states }) => ({
+  // Direct property assignments
+  updateName: (name) => {
+    states.user.name = name; // ✅ Works
+  },
+
+  // Object property mutations
+  updateSettings: (key, value) => {
+    states.settings[key] = value; // ✅ Works
+  },
+
+  // Array mutations
+  addItem: (item) => {
+    states.items.push(item); // ✅ Works
+  },
+
+  // Delete properties
+  removeError: (field) => {
+    delete states.errors[field]; // ✅ Works
+  },
+
+  // Map/Set mutations
+  updateMap: (key, value) => {
+    states.dataMap.set(key, value); // ✅ Works
+  }
+});
+```
+
+### ❌ Deep Nested Mutations (Not Detected)
+
+```tsx
+actions: ({ states }) => ({
+  // ❌ Too deep - won't trigger updates
   updateUserTheme: (userId, theme) => {
     const user = states.users.find((u) => u.id === userId);
-    user.profile.settings.theme = theme; // Deep mutation - not detected
+    user.profile.settings.theme = theme; // 3+ levels deep
   }
 });
 
-// ✅ Correct pattern - creates new references
+// ✅ Fix: Update at the top level instead
 actions: ({ states }) => ({
   updateUserTheme: (userId, theme) => {
     states.users = states.users.map((user) =>
@@ -641,17 +678,12 @@ actions: ({ states }) => ({
 });
 ```
 
-**Why this limitation exists:**
+**Rule:** Mutations on `states.property` and `states.object[key]` are detected. Mutations deeper than `states.obj.nested.deep.prop` may not be detected.
 
-- **Performance** - Deep mutation detection would require complex proxy systems
-- **Compatibility** - Would break Maps, Sets, Dates, and other objects
-- **Simplicity** - Immutable patterns are more predictable and debuggable
+**Workarounds for deep mutations:**
 
-**Workarounds:**
-
-1. **Use immutable patterns** (recommended)
+1. **Replace at top level** (recommended)
 2. **Call `notify()` manually** after deep mutations
-3. **Clone and reassign** the top-level property
 
 ## Best Practices
 
