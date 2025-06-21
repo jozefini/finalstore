@@ -1,4 +1,162 @@
+'use client';
+
+import { createStore } from '../../../../../../packages/store/src/store';
+import { Button } from './button';
 import { WindowWithCode } from './window';
+
+// Counter demo
+type CounterStates = {
+  count: number;
+  multiplier: number;
+};
+
+type CounterActions = {
+  increment: () => void;
+  decrement: () => void;
+  reset: () => void;
+  setMultiplier: (value: number) => void;
+};
+
+type CounterSelectors = {
+  isEven: () => boolean;
+  isGreaterThan: (value: number) => boolean;
+  multipliedValue: () => number;
+  getStatus: () => string;
+};
+
+const counterStore = createStore<
+  CounterStates,
+  CounterActions,
+  CounterSelectors
+>({
+  states: {
+    count: 0,
+    multiplier: 2
+  },
+  actions: ({ states }) => ({
+    increment() {
+      states.count += 1;
+    },
+    decrement() {
+      states.count -= 1;
+    },
+    reset() {
+      states.count = 0;
+    },
+    setMultiplier(value: number) {
+      states.multiplier = value;
+    }
+  }),
+  selectors: ({ states }) => ({
+    isEven: () => states.count % 2 === 0,
+    isGreaterThan: (value: number) => states.count > value,
+    multipliedValue: () => states.count * states.multiplier,
+    getStatus: () => {
+      if (states.count === 0) return 'Zero';
+      if (states.count > 0) return 'Positive';
+      return 'Negative';
+    }
+  })
+});
+
+function CounterDemo() {
+  const count = counterStore.use((state) => state.count);
+  const multiplier = counterStore.use((state) => state.multiplier);
+  const isEven = counterStore.use.isEven();
+  const multipliedValue = counterStore.use.multipliedValue();
+  const status = counterStore.use.getStatus();
+  const isGreaterThanFive = counterStore.use.isGreaterThan(5);
+
+  return (
+    <div className="w-full max-w-sm space-y-4 px-4 py-8 lg:py-20">
+      {/* Counter Display */}
+      <div className="text-center">
+        <div className="mb-2 text-4xl font-bold text-gray-900">{count}</div>
+        <div className="text-sm text-gray-500">Current Count</div>
+      </div>
+
+      {/* Actions */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-gray-700">Actions</h3>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={() => counterStore.dispatch.decrement()}
+            className="flex-1"
+          >
+            -1
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => counterStore.dispatch.increment()}
+            className="flex-1"
+          >
+            +1
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => counterStore.dispatch.reset()}
+            className="flex-1"
+          >
+            Reset
+          </Button>
+        </div>
+      </div>
+
+      {/* Multiplier Control */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-gray-700">
+          Multiplier: {multiplier}
+        </h3>
+        <div className="flex gap-1">
+          {[1, 2, 3, 5, 10].map((value) => (
+            <Button
+              key={value}
+              variant={multiplier === value ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => counterStore.dispatch.setMultiplier(value)}
+              className="flex-1 text-xs"
+            >
+              {value}x
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Selectors Display */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-gray-700">
+          Computed Values (Selectors)
+        </h3>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <div className="text-xs text-gray-500">Even/Odd</div>
+            <div className="font-semibold text-gray-900">
+              {isEven ? '✓ Even' : '✗ Odd'}
+            </div>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <div className="text-xs text-gray-500">Status</div>
+            <div className="font-semibold text-gray-900">{status}</div>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <div className="text-xs text-gray-500">Multiplied</div>
+            <div className="font-semibold text-gray-900">
+              {count} × {multiplier} = {multipliedValue}
+            </div>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <div className="text-xs text-gray-500">&gt; 5</div>
+            <div className="font-semibold text-gray-900">
+              {isGreaterThanFive ? '✓ Yes' : '✗ No'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const codeExample = `
 import { createStore } from 'finalstore'
@@ -134,7 +292,9 @@ export function ThreeWaySection() {
 
           {/* Right side - Window (75% width on desktop) */}
           <div className="lg:w-3/4">
-            <WindowWithCode title="" code={codeExample} className="w-full" />
+            <WindowWithCode code={codeExample} className="w-full">
+              <CounterDemo />
+            </WindowWithCode>
           </div>
         </div>
       </div>

@@ -3,13 +3,6 @@ import Link from 'next/link';
 import { AsyncSection } from './components/ui/async-section';
 import { EventSystemSection } from './components/ui/event-system-section';
 import { HeroSection } from './components/ui/hero-section';
-import { AsyncTest } from './components/ui/store-test';
-// import {
-//   AsyncTest,
-//   BasicStoreTest,
-//   BatchingTest,
-//   PerformanceTest
-// } from './components/ui/store-test';
 import { ThreeWaySection } from './components/ui/three-way-section';
 
 export default function HomePage() {
@@ -20,39 +13,6 @@ export default function HomePage() {
       <ThreeWaySection />
       <AsyncSection />
       <EventSystemSection />
-
-      <AsyncTest />
-      {/* <div className="mx-auto mt-20 grid w-full max-w-2xl gap-y-10">
-        <BasicStoreTest />
-        <BatchingTest />
-        <PerformanceTest />
-        </div>
-
-      <div className="mx-auto mt-20 grid w-full max-w-[900px] grid-cols-1 gap-6 px-4 md:grid-cols-3">
-        <div className="border-fd-border rounded-lg border p-6">
-          <h3 className="mb-2 text-lg font-semibold">Lightweight</h3>
-          <p className="text-fd-muted-foreground">
-            Small bundle size with zero dependencies. Fast and efficient state
-            updates.
-          </p>
-        </div>
-
-        <div className="border-fd-border rounded-lg border p-6">
-          <h3 className="mb-2 text-lg font-semibold">Type Safe</h3>
-          <p className="text-fd-muted-foreground">
-            Built with TypeScript for robust development. Full type inference
-            for states and actions.
-          </p>
-        </div>
-
-        <div className="border-fd-border rounded-lg border p-6">
-          <h3 className="mb-2 text-lg font-semibold">Collections</h3>
-          <p className="text-fd-muted-foreground">
-            Efficient management of dynamic data sets with individual item
-            subscriptions.
-          </p>
-        </div>
-      </div> */}
 
       <div className="mb-10 mt-20 text-center">
         <Link

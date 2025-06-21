@@ -4,7 +4,6 @@ import { createStore } from '../../../../../../packages/store/src/store';
 import { Button } from './button';
 import { WindowWithCode } from './window';
 
-// Fake user data
 type User = {
   id: string;
   name: string;
@@ -58,7 +57,6 @@ const userStore = createStore<UserStates, UserActions>({
   states: initialUserState,
   actions: ({ states, notify }) => ({
     async fetchUser(id: string) {
-      // Set loading state immediately
       states.loading = true;
       states.error = null;
       states.user = null;
@@ -100,7 +98,7 @@ function AsyncDemo() {
   };
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="w-full max-w-sm space-y-4 px-4 py-8 lg:py-32">
       {/* User Selection */}
       <div>
         <h3 className="mb-2 text-sm font-semibold text-gray-700">Fetch User</h3>
@@ -128,16 +126,15 @@ function AsyncDemo() {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700">Current User</h3>
-          {user && !loading && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-6 px-2 py-1 text-xs"
-              onClick={() => userStore.dispatch.clearUser()}
-            >
-              Clear
-            </Button>
-          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-6 px-2 py-1 text-xs"
+            disabled={!user || loading}
+            onClick={() => userStore.dispatch.clearUser()}
+          >
+            Clear
+          </Button>
         </div>
 
         <div className="flex h-32 items-center justify-center rounded-lg border border-gray-200 bg-white">
@@ -344,11 +341,7 @@ export function AsyncSection() {
 
           {/* Right side - Window (75% width on desktop) */}
           <div className="lg:w-3/4">
-            <WindowWithCode
-              title="Interactive Async Demo"
-              code={codeExample}
-              className="w-full"
-            >
+            <WindowWithCode code={codeExample} className="w-full">
               <AsyncDemo />
             </WindowWithCode>
           </div>

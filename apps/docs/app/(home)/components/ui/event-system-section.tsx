@@ -99,7 +99,7 @@ function CartDemo() {
   }, []);
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="w-full max-w-sm space-y-4 px-4 py-8 lg:py-16">
       {/* Available Items */}
       <div>
         <h3 className="mb-2 text-sm font-semibold text-gray-700">
@@ -146,10 +146,10 @@ function CartDemo() {
             Cart ({cart.length})
           </h3>
           <Button
-            variant="danger"
+            variant="secondary"
             size="sm"
-            disabled={cart.length === 0}
             className="h-6 px-2 py-1 text-xs"
+            disabled={cart.length === 0}
             onClick={() => cartStore.dispatch.clearCart()}
           >
             Clear
