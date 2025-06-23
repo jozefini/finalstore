@@ -3,7 +3,7 @@ title: Dispatch
 icon: Parentheses
 ---
 
-# Dispatch Actions
+# Dispatch
 
 The `dispatch` object is how you execute actions to update your store's state.
 
@@ -41,12 +41,19 @@ const store = createStore<States, Actions>({
       states.count += amount;
     },
     async fetchCount() {
-      // Simulate an API call
-      const response = await new Promise<number>((resolve) =>
-        setTimeout(() => resolve(Math.floor(Math.random() * 100)), 500)
-      );
-      states.count = response;
-      return response;
+      states.isLoading = true;
+      notify(); // Immediately updates UI to show loading state
+
+      try {
+        const response = await new Promise<number>((resolve) =>
+          setTimeout(() => resolve(Math.floor(Math.random() * 100)), 500)
+        );
+        states.count = response;
+        return response;
+      } finally {
+        states.isLoading = false;
+        // Final notification happens automatically
+      }
     }
   })
 });
@@ -83,30 +90,24 @@ function Counter() {
 }
 ```
 
-## Async Actions with Immediate UI Updates
+## Batching Dispatches
 
-A powerful feature of `finalstore` is the ability to push immediate state updates in the middle of an async action, _before_ it fully completes. This is perfect for handling loading states.
+To optimize performance, you can group multiple synchronous state updates into a single re-render using `store.batch()`.
 
-Call `notify()` right after you set the loading state. This will instantly re-render any subscribed components. The store will then notify subscribers again automatically when the entire async action is finished.
+Any `dispatch` calls made inside the `batch` callback will update the state, but components will only be notified to re-render **once**, after the entire batch has completed.
 
 ```ts
-// In your store's actions:
-async fetchCount() {
-  states.isLoading = true;
-  notify(); // Immediately updates UI to show loading state
-
-  try {
-    const response = await new Promise<number>((resolve) =>
-      setTimeout(() => resolve(Math.floor(Math.random() * 100)), 500)
-    );
-    states.count = response;
-    return response;
-  } finally {
-    states.isLoading = false;
-    // Final notification happens automatically
-  }
+function handleComplexUpdate() {
+  store.batch(() => {
+    store.dispatch.increment(); // State changes
+    store.dispatch.incrementBy(10); // State changes again
+    // ... any number of synchronous dispatches
+  });
+  // React components re-render only ONCE here.
 }
 ```
+
+**Note:** Batching is intended for synchronous actions. Asynchronous actions inside a `batch` will still trigger their own notifications as they complete.
 
 ## Dispatching Async Actions
 
