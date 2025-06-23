@@ -3,7 +3,49 @@ title: DevTools
 icon: BugPlay
 ---
 
-Redux DevTools integration provides powerful debugging capabilities. With DevTools enabled, you can inspect state changes, time-travel through actions, and debug your application's state management in real-time.
+finalstore has built-in support for the Redux DevTools Extension. This allows you to inspect your state, view action history, and time-travel debug your application.
+
+## Enabling DevTools
+
+To enable DevTools, set the `devtools` option to `true` in your store's configuration. It's recommended to only enable this in development.
+
+```ts
+import { createStore } from 'finalstore';
+
+const store = createStore({
+  states: {
+    count: 0,
+    user: null as { name: string } | null
+  },
+  actions: {
+    increment: (state) => {
+      state.count++;
+    },
+    setUser: (state, user: { name: string }) => {
+      state.user = user;
+    }
+  },
+  selectors: {
+    userInfo: (state) => ({
+      name: state.user?.name,
+      count: state.count
+    })
+  },
+  config: {
+    name: 'MyAppStore', // A name for your store instance
+    devtools: process.env.NODE_ENV === 'development'
+  }
+});
+```
+
+## Features
+
+- **Action History:** See a log of all dispatched actions and their payloads.
+- **State Inspection:** Inspect the full state tree at any point in time.
+- **Time-Travel Debugging:** Jump back to a previous state to debug complex state interactions.
+- **Action Replay:** Replay a sequence of actions to reproduce a specific state.
+
+Once enabled, open your browser's Redux DevTools to see your store's activity.
 
 ## Store Configuration
 

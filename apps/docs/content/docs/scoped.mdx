@@ -5,53 +5,73 @@ icon: ScanSearch
 
 Scoped state provides component-level state management through a Provider/Consumer pattern. This allows you to create isolated state instances for specific components or features.
 
-## Scoped Store
+# Scoped Stores
 
-```tsx
+Scoped stores allow you to create a store that is only available to a specific part of your React component tree. This is useful for state that is complex but local to a feature or section of your app, preventing it from cluttering the global state.
+
+## Creating a Scoped Store
+
+Use `createScopedStore` to create a `Provider` component and a `useStore` hook.
+
+```ts
+// features/form/form-store.ts
 import { createScopedStore } from 'finalstore';
 
-const modal = createScopedStore({
+export const { Provider, useStore } = createScopedStore({
   states: {
-    isOpen: false,
-    title: ''
-  },
-  actions: {
-    toggle: (state) => {
-      state.isOpen = !state.isOpen;
+    formData: {
+      name: '',
+      email: ''
     },
-    setTitle: (state, title: string) => {
-      state.title = title;
-    }
+    isSubmitting: false
   },
-  selectors: {}
+  actions: ({ states }) => ({
+    updateField: (field: string, value: string) => {
+      states.formData[field] = value;
+    },
+    setSubmitting: (isSubmitting: boolean) => {
+      states.isSubmitting = isSubmitting;
+    }
+  })
 });
+```
 
-function Modal() {
+## Using a Scoped Store
+
+1.  Wrap the component tree that needs access to the store with the `Provider`.
+2.  Use the `useStore` hook to access the store within that tree.
+
+```tsx
+// features/form/form.tsx
+import { Provider, useStore } from './form-store';
+
+function Form() {
+  const store = useStore();
+  const formData = store.use((state) => state.formData);
+
+  const handleChange = (e) => {
+    store.dispatch.updateField(e.target.name, e.target.value);
+  };
+
   return (
-    <modal.Provider>
-      <ModalContent />
-    </modal.Provider>
+    <form>
+      <input name="name" value={formData.name} onChange={handleChange} />
+      <input name="email" value={formData.email} onChange={handleChange} />
+    </form>
   );
 }
 
-function ModalContent() {
-  const store = modal.useStore();
-  const isOpen = store.use((state) => state.isOpen);
-  const title = store.use((state) => state.title);
-
+// App.tsx
+export default function App() {
   return (
-    <div>
-      {isOpen && (
-        <div>
-          <h2>{title}</h2>
-          <div>Modal Content</div>
-        </div>
-      )}
-      <button onClick={() => store.dispatch('toggle')}>Toggle</button>
-    </div>
+    <Provider>
+      <Form />
+    </Provider>
   );
 }
 ```
+
+The `useStore` hook returns the store instance, which has the same `use`, `get`, `dispatch`, and `reset` methods as a global store.
 
 ## Scoped Collection
 

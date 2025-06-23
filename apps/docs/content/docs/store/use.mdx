@@ -3,70 +3,90 @@ title: use()
 icon: Parentheses
 ---
 
-The `use()` hook enables reactive state management in React components. When the selected state values change, your component will automatically re-render with the latest data.
+# use()
 
-```tsx
+The `use()` hook provides **reactive**, synchronous access to your store's state from within React components.
+
+Use this hook to bind your components to the store. Any component that calls `use()` will automatically re-render whenever the specific piece of state it subscribes to changes.
+
+First, let's set up a store to use in our examples:
+
+```ts
+// store.ts
 import { createStore } from 'finalstore';
 
+// 1. Create store types
+type States = { ... }
+type Actions = { ... }
+type Selectors = {
+  userAge: () => number;
+  getTodoById: () => Todo;
+};
+
+// 2. Pass types to createStore.
 const store = createStore({
   states: {
-    count: 0,
-    user: null as { name: string } | null
+    user: { name: 'John Doe', age: 30 },
+    todos: [{ id: 1, text: 'Learn finalstore', completed: true }]
   },
-  actions: {}, // Required, even if empty
-  selectors: {
-    userInfo: (state) => ({
-      name: state.user?.name,
-      count: state.count
-    })
-  }
+  selectors: ({ states }) => ({
+    userAge: () => states.user.age,
+    getTodoById: (id: number) => {
+      return states.todos.find((todo) => todo.id === id);
+    }
+  })
 });
 ```
 
-## Basic Usage
+## Subscribing to the Entire State
+
+Call `use()` with no arguments to subscribe your component to the _entire_ state object.
+
+**Note:** Use this with caution. It will cause the component to re-render whenever _any_ value in the state changes.
 
 ```tsx
-function Counter() {
-  // Get entire state
+function ProfileHeader() {
   const state = store.use();
-
-  // Get specific value using custom selector (recommended)
-  const count = store.use((state) => state.count);
-
-  return <div>Count: {count}</div>;
+  return <h1>{state.user.name}'s Profile</h1>;
 }
 ```
 
-## With Custom Selectors
+## Subscribing to Specific State (Inline Selector)
+
+Pass a selector function to `use()` to subscribe to a specific slice of state. This is the recommended approach for performance, as the component will only re-render when the selected value changes.
 
 ```tsx
-function UserProfile() {
-  const { user, count } = store.use((state) => ({
-    user: state.user,
-    count: state.count
-  }));
-
-  return (
-    <div>
-      <p>User: {user?.name}</p>
-      <p>Count: {count}</p>
-    </div>
-  );
+// Subscribes to a single value
+function UserAge() {
+  const age = store.use((state) => state.user.age);
+  return <p>Age: {age}</p>;
 }
-```
 
-## With Predefined Selectors
-
-```tsx
+// Subscribes to a nested object
 function UserInfo() {
-  // Using predefined selector
-  const userInfo = store.useSelector.userInfo();
-
+  const { name, age } = store.use((state) => state.user);
   return (
-    <div>
-      <p>User: {userInfo.name}</p>
-      <p>Count: {userInfo.count}</p>
-    </div>
+    <p>
+      {name} is {age} years old.
+    </p>
   );
+}
+```
+
+## Subscribing with Pre-defined Selectors
+
+Access your [pre-defined selectors](./selector#pre-defined-selectors) directly on the `use` object. This is the cleanest way to reuse state logic across multiple components.
+
+```tsx
+// Using a simple pre-defined selector
+function AgeDisplay() {
+  const age = store.use.userAge();
+  return <p>User's age is {age}</p>;
+}
+
+// Using a selector that accepts an argument
+function TodoItem({ id }: { id: number }) {
+  const todo = store.use.getTodoById(id);
+  return <li>{todo.text}</li>;
 }
 ```

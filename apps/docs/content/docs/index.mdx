@@ -5,7 +5,59 @@ icon: BookOpen
 
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-Intuitive state management for React applications with first-class TypeScript support. It offers both global stores and collection management with minimal boilerplate.
+# Welcome to finalstore
+
+The last state management library you'll ever need.
+
+## Features
+
+- **Zero Boilerplate:** No actions, reducers, or dispatchers to define. Just write your state and mutate it.
+- **Direct State Mutation:** A simple, intuitive API that feels like using a plain JavaScript object.
+- **TypeScript First:** Built from the ground up with TypeScript for end-to-end type safety.
+- **React Optimized:** Seamlessly integrates with React, providing optimized re-renders out of the box.
+- **Powerful Selectors:** Compute derived state with memoized selectors.
+- **Async Ready:** Handle asynchronous operations with ease using `async/await`.
+- **Developer Tools:** Debug your state changes with full Redux DevTools support.
+
+## Quick Start
+
+Create a store, define your state, and write your actions. That's it.
+
+```tsx
+import { createStore } from 'finalstore';
+
+import { useStore } from './store';
+
+// 1. Define your initial state and actions
+const store = createStore({
+  states: {
+    count: 0
+  },
+  actions: ({ states }) => ({
+    increment: () => {
+      states.count++;
+    },
+    incrementBy: (amount: number) => {
+      states.count += amount;
+    }
+  })
+});
+
+// 2. Use it in your components
+function Counter() {
+  const count = store.use((state) => state.count);
+
+  return (
+    <div>
+      <h1>{count}</h1>
+      <button onClick={store.dispatch.increment}>Increment</button>
+      <button onClick={() => store.dispatch.incrementBy(5)}>
+        Increment by 5
+      </button>
+    </div>
+  );
+}
+```
 
 ## Installation
 
@@ -112,7 +164,7 @@ function TodoItem({ id }: { id: string }) {
 - **Scoped State**: Component-level state isolation
 - **Type Safety**: First-class TypeScript support
 
-## Why FinalStore?
+## Why finalstore?
 
 - 🎯 **Simple API**: Intuitive methods that feel natural in React
 - 🔒 **Type Safe**: Built with TypeScript for robust development

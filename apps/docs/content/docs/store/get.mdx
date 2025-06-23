@@ -3,24 +3,75 @@ title: get()
 icon: Parentheses
 ---
 
-The `get()` method allows you to retrieve the current state values synchronously from your store. You can access either the entire state object or select specific values using a selector function.
+# Getters
 
-```tsx
+The `get()` method provides **non-reactive**, synchronous access to your store's state.
+
+Use `get()` when you need a snapshot of the state _outside_ of a React component—in an event handler, a utility function, or on the server. It does **not** trigger re-renders.
+
+First, let's set up a store to use in our examples:
+
+```ts
+// store.ts
 import { createStore } from 'finalstore';
 
-const store = createStore({
+// 1. Create store types
+type States = { ... }
+type Actions = { ... }
+type Selectors = {
+  userAge: () => number;
+  getTodoById: () => Todo;
+};
+
+// 2. Pass types to createStore.
+const store = createStore<States, Actions, Selectors>({
   states: {
-    count: 0,
-    user: null as { name: string } | null
+    user: { name: 'John Doe', age: 30 },
+    todos: [{ id: 1, text: 'Learn finalstore', completed: true }]
   },
-  actions: {}, // Required, even if empty
-  selectors: {
-    userInfo: (state) => ({
-      name: state.user?.name,
-      count: state.count
-    })
-  }
+  selectors: ({ states }) => ({
+    userAge: () => states.user.age,
+    getTodoById: (id: number) => {
+      return states.todos.find((todo) => todo.id === id);
+    }
+  })
 });
+```
+
+## Get Entire State
+
+Call `get()` with no arguments to retrieve the entire state object.
+
+```ts
+const currentState = store.get();
+// { user: { name: 'John Doe', age: 30 }, todos: [...] }
+console.log(currentState.user.name); // 'John Doe'
+```
+
+## Get Specific State (Inline Selector)
+
+Pass a selector function to `get()` to retrieve a specific slice of state. This is more performant as it avoids returning the whole state object.
+
+```ts
+// Get a single value
+const userName = store.get((state) => state.user.name); // 'John Doe'
+
+// Get multiple values from a nested object
+const { name, age } = store.get((state) => state.user);
+console.log(`${name} is ${age} years old.`); // 'John Doe is 30 years old.'
+```
+
+## Get with Pre-defined Selectors
+
+Access your [pre-defined selectors](./selector#pre-defined-selectors) directly on the `get` object. This is the cleanest way to reuse state logic outside of components.
+
+```ts
+// Get a value from a simple pre-defined selector
+const age = store.get.userAge(); // 30
+
+// Use a selector that accepts an argument
+const todo = store.get.getTodoById(1);
+console.log(todo.text); // 'Learn finalstore'
 ```
 
 ## Basic Usage

@@ -68,3 +68,49 @@ await store.silentDispatch.fetchUser('123');
 ```
 
 The return values work the same way with both `dispatch` and `silentDispatch`.
+
+# dispatch
+
+The `dispatch` object is how you execute actions to update the store's state.
+
+## How to Dispatch Actions
+
+Every action you define is available on `store.dispatch`. Call them as you would any other function.
+
+```ts
+// Call an action without arguments
+store.dispatch.increment();
+
+// Call an action with arguments
+store.dispatch.incrementBy(5);
+```
+
+## Dispatching in React
+
+In your components, you can call `dispatch` directly in event handlers.
+
+```tsx
+function Counter() {
+  const count = store.use((state) => state.count);
+  const { increment, incrementBy } = store.dispatch;
+
+  return (
+    <div>
+      <h1>{count}</h1>
+      <button onClick={increment}>+1</button>
+      <button onClick={() => incrementBy(5)}>+5</button>
+    </div>
+  );
+}
+```
+
+## Async Actions
+
+When you dispatch an async action, it returns a `Promise` that resolves when the action completes.
+
+```ts
+async function handleFetch() {
+  await store.dispatch.fetchUser();
+  console.log('User fetched!');
+}
+```

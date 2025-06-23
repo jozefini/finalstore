@@ -3,7 +3,36 @@ title: reset()
 icon: Parentheses
 ---
 
-The `reset()` method returns the store to its initial state. This is useful for clearing all state changes, such as during cleanup or when needing to start fresh.
+# reset
+
+The `reset` method restores the store to its initial state.
+
+## How to Reset the Store
+
+Call `store.reset()` to revert all state values to what you defined in `createStore`. This will also trigger a re-render in any components that are subscribed to the changes.
+
+```ts
+store.reset();
+```
+
+## Example
+
+```tsx
+function Settings() {
+  const { settings, dispatch, reset } = store;
+
+  const handleReset = () => {
+    reset();
+  };
+
+  return (
+    <div>
+      {/* ... */}
+      <button onClick={handleReset}>Reset to Defaults</button>
+    </div>
+  );
+}
+```
 
 ```tsx
 import { createStore } from 'finalstore';

@@ -4,6 +4,110 @@ description: Lightweight state management for React with TypeScript support
 icon: Atom
 ---
 
+# Store
+
+A store holds your application's global state. It's where you define, mutate, and access the data that your components will use.
+
+## Creating a Store: Type-Safe Setup
+
+For the best experience with full type safety and autocompletion, follow this pattern when creating your store.
+
+**1. Define Initial State**
+Create an `initialStates` object. Use `as Type` to ensure TypeScript knows the exact type, especially for `null` or empty arrays.
+
+```ts
+const initialStates = {
+  todos: [] as { id: number; text: string; completed: boolean }[],
+  filter: 'all' as 'all' | 'completed' | 'pending'
+};
+```
+
+**2. Infer State and Define Action/Selector Types**
+Infer the `States` type directly from `initialStates`. Then, define the types for your `Actions` and `Selectors`.
+
+```ts
+type States = typeof initialStates;
+
+type Actions = {
+  addTodo: (text: string) => void;
+  toggleTodo: (id: number) => void;
+};
+
+type Selectors = {
+  completedTodos: () => States['todos'];
+  pendingTodos: () => States['todos'];
+  stats: () => { completed: number; pending: number; total: number };
+};
+```
+
+**3. Create the Store with Generics**
+Pass your defined types as generics to `createStore`. This unlocks full type safety, including the ability for selectors to call other selectors.
+
+If you don't have actions, you can pass an empty object: `createStore<States, {}, Selectors>`.
+
+```ts
+// store.ts
+import { createStore } from 'finalstore';
+
+// ... types defined above
+
+const store = createStore<States, Actions, Selectors>({
+  states: initialStates,
+  actions: ({ states }) => ({
+    addTodo: (text: string) => {
+      states.todos.push({ id: Date.now(), text, completed: false });
+    },
+    toggleTodo: (id: number) => {
+      const todo = states.todos.find((t) => t.id === id);
+      if (todo) {
+        todo.completed = !todo.completed;
+      }
+    }
+  }),
+  selectors: ({ states, selectors }) => ({
+    completedTodos: () => {
+      return states.todos.filter((todo) => todo.completed);
+    },
+    pendingTodos: () => {
+      return states.todos.filter((todo) => !todo.completed);
+    },
+    // ✅ This selector calls other selectors!
+    stats: () => {
+      const completed = selectors.completedTodos().length;
+      const pending = selectors.pendingTodos().length;
+      return {
+        completed,
+        pending,
+        total: completed + pending
+      };
+    }
+  })
+});
+```
+
+By explicitly defining the `Selectors` type and passing it to `createStore`, the `selectors` object within the definition block becomes fully typed, allowing you to safely compose them.
+
+## State Mutation
+
+Actions are the only place where you should mutate state. You can mutate the `states` object directly, just like you would with a regular JavaScript object.
+
+```ts
+// GOOD: Mutating state inside an action
+const store = createStore({
+  // ...
+  actions: ({ states }) => ({
+    increment: () => {
+      states.count++;
+    }
+  })
+});
+
+// BAD: Mutating state outside of an action
+store.get().count++; // This will not work
+```
+
+The store uses a deep proxy system to detect changes, so you can mutate nested objects and arrays directly.
+
 ## Quick Start
 
 ```tsx

@@ -3,90 +3,95 @@ title: selector()
 icon: Parentheses
 ---
 
-The `selector` methods allow you to create reusable selectors that can compute derived state with optional parameters. Selectors are required when creating a store, even if empty.
+# Selectors
+
+Selectors compute derived state. Think of them as the query language for your store.
+
+`finalstore` offers two ways to select state: **inline selectors** for quick, component-specific queries, and **pre-defined selectors** for reusable, performant, and app-wide computations.
+
+## Inline Selectors
+
+Use an inline selector for simple, one-off state access directly within your components. Just pass a function to `store.use()` or `store.get()`.
 
 ```tsx
-import { createStore } from 'finalstore';
+import { store } from './store';
 
-const store = createStore({
-  states: {
-    todos: [] as { id: number; text: string; completed: boolean }[]
-  },
-  actions: {}, // Required, even if empty
-  selectors: {
-    // Selector with parameter
-    filteredTodos: (state, completed?: boolean) => {
-      if (completed === undefined) return state.todos;
-      return state.todos.filter((todo) => todo.completed === completed);
-    },
-    // Selector without parameter
-    totalTodos: (state) => state.todos.length
-  }
-});
-```
+function Profile() {
+  // Select a single value
+  const name = store.use((state) => state.user.name);
 
-## Inside Components (use)
-
-Use the `use` for reactive state in components:
-
-```tsx
-function TodoList({ showCompleted }: { showCompleted: boolean }) {
-  // Use use for reactive updates
-  const todos = store.use.filteredTodos(showCompleted);
-
-  return (
-    <ul>
-      {todos.map((todo) => (
-        <li key={todo.id}>{todo.text}</li>
-      ))}
-    </ul>
-  );
-}
-
-function TodoStats() {
-  // Both will trigger re-renders when their values change
-  const completedTodos = store.use.filteredTodos(true);
-  const total = store.use.totalTodos();
+  // Select multiple values into a new object
+  const { count, user } = store.use((state) => ({
+    count: state.count,
+    user: state.user
+  }));
 
   return (
     <div>
-      <p>Total: {total}</p>
-      <p>Completed: {completedTodos.length}</p>
+      <p>Name: {name}</p>
+      <p>Count: {count}</p>
     </div>
   );
 }
 ```
 
-## Outside Components (get)
+This is great for co-locating simple state selection with the component that uses it.
 
-Use the `get` for non-reactive state access:
+## Pre-defined Selectors
 
-```tsx
-function handleTodoAction() {
-  // Get current values synchronously
-  const completedTodos = store.get.filteredTodos(true);
-  const total = store.get.totalTodos();
+Define selectors in your `createStore` config to create reusable, memoized functions for accessing derived state. This is the key to keeping your components clean, your logic centralized, and your application fast.
 
-  console.log(`${completedTodos.length} of ${total} todos completed`);
-}
+### The Power of Pre-defined Selectors
 
-// Can be used in async functions
-async function processTodos() {
-  const todos = store.get.filteredTodos(true);
-  await saveTodos(todos);
-}
-```
+1.  **Type-Safe Composition:** By providing the `Selectors` type to `createStore`, you unlock the ability for selectors to safely call other selectors. This is a powerful pattern for building complex, derived state from smaller, reusable pieces.
 
-## Type Safety
+    ```ts
+    // store.ts
+    import { createStore } from 'finalstore';
 
-Selectors are fully type-safe. TypeScript will ensure that:
+    // 1. Create store types
+    type States = { ... }
+    type Actions = { ... }
+    type Selectors = {
+      completedTodos: () => Todo[];
+      pendingTodos: () => Todo[];
+      stats: () => { completed: number; pending: number };
+    };
 
-- The selector exists in your store's selectors
-- The parameter type matches the selector's expected parameter type
-- The return type matches the selector's defined return type
+    // 2. Pass types to createStore.
+    // The `Selectors` type must be passed as the third generic argument.
+    const store = createStore<States, Actions, Selectors>({
+      states: {
+        todos: []
+      },
+      selectors: ({ states, selectors }) => ({
+        completedTodos: () => {
+          return states.todos.filter((todo) => todo.completed);
+        },
+        pendingTodos: () => {
+          return states.todos.filter((todo) => !todo.completed);
+        },
+        // ✅ This selector calls other selectors!
+        stats: () => ({
+          completed: selectors.completedTodos().length,
+          pending: selectors.pendingTodos().length
+        })
+      })
+    });
+    ```
 
-```tsx
-// TypeScript will catch these errors:
-store.use.nonexistentSelector(); // Error: Property doesn't exist
-store.get.filteredTodos(123); // Error: Expected boolean | undefined
-```
+2.  **Automatic Memoization:** Pre-defined selectors are memoized out of the box. `finalstore` tracks which state they depend on and only recomputes them when that specific state changes. This prevents expensive calculations and unnecessary re-renders.
+
+3.  **Keep Components Lean & Reusable:** Move complex logic out of your components and define it once. Then, reuse it anywhere—in any component (`store.use`) or outside of React (`store.get`).
+
+    ```tsx
+    // Instead of this complex logic in your component...
+    const stats = store.use((state) => {
+      const completed = state.todos.filter((t) => t.completed).length;
+      const pending = state.todos.filter((t) => !t.completed).length;
+      return { completed, pending };
+    });
+
+    // ...just call your clean, pre-defined selector:
+    const stats = store.use.stats();
+    ```
