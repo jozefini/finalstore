@@ -6,6 +6,9 @@
     "get",
     "use",
     "dispatch",
-    "reset"
+    "events",
+    "reset",
+    "scoped",
+    "devtools"
   ]
 }

@@ -1,0 +1,92 @@
+---
+title: Events
+icon: Parentheses
+---
+
+# Store Events
+
+Events are a powerful way to handle side-effects and broadcast information from your store without coupling it to specific components or modules.
+
+Think of it as a pub/sub system built right into your store. Use it for things like analytics, showing notifications, or communicating between different parts of your application.
+
+First, let's set up a store that uses events:
+
+```ts
+// store.ts
+import { createStore } from 'finalstore';
+
+// 1. Define your types, including Events
+type States = {
+  user: { name: string; id: string } | null;
+};
+
+type Actions = {
+  login: (credentials: any) => Promise<void>;
+  logout: () => void;
+};
+
+type Events = {
+  userLoggedIn: { userId: string; timestamp: number };
+  userLoggedOut: { reason: string };
+  errorOccurred: { message: string; code: number };
+};
+
+// 2. Pass the Events type as the 4th generic argument
+const store = createStore<States, Actions, {}, Events>({
+  states: {
+    user: null
+  },
+  actions: ({ states, trigger }) => ({
+    async login(credentials) {
+      try {
+        // Assume api.login returns a user object
+        const user = { name: 'John Doe', id: '123' };
+        states.user = user;
+
+        // ✅ Trigger an event with a payload
+        trigger('userLoggedIn', { userId: user.id, timestamp: Date.now() });
+      } catch (e) {
+        trigger('errorOccurred', { message: e.message, code: 500 });
+      }
+    },
+    logout() {
+      states.user = null;
+      trigger('userLoggedOut', { reason: 'user_initiated' });
+    }
+  })
+});
+```
+
+## Subscribing to Events
+
+Use `store.on()` to subscribe to an event. It takes the event name and a callback function, which will receive the event's payload.
+
+It returns a listener object with an `off()` method to unsubscribe.
+
+```ts
+// analytics.ts
+import { store } from './store';
+
+// Listen for the 'userLoggedIn' event
+const userLoginListener = store.on('userLoggedIn', (payload) => {
+  console.log(`User ${payload.userId} logged in at ${payload.timestamp}`);
+  // trackAnalytics('User Login', payload);
+});
+
+// You can have multiple listeners for the same event
+const errorListener = store.on('errorOccurred', (payload) => {
+  // showToast(`Error: ${payload.message}`);
+});
+```
+
+## Unsubscribing from Events
+
+To prevent memory leaks, always clean up your listeners when they are no longer needed. Call the `.off()` method on the listener object returned by `store.on()`.
+
+```ts
+// Unsubscribe when the module is destroyed or no longer needs to listen
+function cleanup() {
+  userLoginListener.off();
+  errorListener.off();
+}
+```

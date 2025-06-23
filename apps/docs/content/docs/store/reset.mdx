@@ -1,86 +1,37 @@
 ---
-title: reset()
+title: Reset
 icon: Parentheses
 ---
 
-# reset
+# Reset states
 
-The `reset` method restores the store to its initial state.
+Every store you create comes with a built-in `reset()` method.
 
-## How to Reset the Store
+Calling `store.reset()` reverts all state values back to the `initialStates` you provided when creating the store. This is useful for clearing user data on logout, resetting a form, or anytime you need to return to a clean slate.
 
-Call `store.reset()` to revert all state values to what you defined in `createStore`. This will also trigger a re-render in any components that are subscribed to the changes.
+## Basic Usage
+
+It's a simple, zero-argument function call.
 
 ```ts
+// This will revert all states in the store to their initial values.
 store.reset();
 ```
 
-## Example
+## Example in a Component
+
+You can destructure `reset` directly from the store instance for clean use in your components.
 
 ```tsx
-function Settings() {
-  const { settings, dispatch, reset } = store;
+function SettingsManager() {
+  const { reset } = store;
 
-  const handleReset = () => {
+  const handleResetClick = () => {
     reset();
   };
 
   return (
-    <div>
-      {/* ... */}
-      <button onClick={handleReset}>Reset to Defaults</button>
-    </div>
+    <button onClick={handleResetClick}>Reset All Settings to Default</button>
   );
-}
-```
-
-```tsx
-import { createStore } from 'finalstore';
-
-const store = createStore({
-  states: {
-    count: 0,
-    user: null as { name: string } | null
-  },
-  actions: {
-    increment: (state) => {
-      state.count++;
-    },
-    setUser: (state, user: { name: string }) => {
-      state.user = user;
-    }
-  }
-});
-```
-
-## Basic Usage
-
-```tsx
-function ResetButton() {
-  return (
-    <button
-      onClick={() => {
-        store.reset();
-        console.log('Store reset to:', store.get());
-      }}
-    >
-      Reset Store
-    </button>
-  );
-}
-```
-
-## With Cleanup
-
-```tsx
-function CleanupExample() {
-  React.useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      store.reset();
-    };
-  }, []);
-
-  return <div>Component with cleanup</div>;
 }
 ```

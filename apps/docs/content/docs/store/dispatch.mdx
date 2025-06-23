@@ -1,93 +1,72 @@
 ---
-title: dispatch()
+title: Dispatch
 icon: Parentheses
 ---
 
-The `dispatch()` method is used to trigger state updates through predefined actions. It supports both synchronous and asynchronous actions, and can return values from the actions.
+# Dispatch Actions
 
-```tsx
+The `dispatch` object is how you execute actions to update your store's state.
+
+Every function you define in the `actions` object of your store is made available on `store.dispatch`.
+
+First, let's set up a store with some actions to use in our examples:
+
+```ts
+// store.ts
 import { createStore } from 'finalstore';
 
-const store = createStore({
+// 1. Define your types
+type States = {
+  count: number;
+  isLoading: boolean;
+};
+
+type Actions = {
+  increment: () => void;
+  incrementBy: (amount: number) => void;
+  fetchCount: () => Promise<number>;
+};
+
+// 2. Pass types to createStore
+const store = createStore<States, Actions>({
   states: {
     count: 0,
-    user: null as { name: string } | null
+    isLoading: false
   },
-  actions: {
-    // Sync action with no return
-    increment: (state) => {
-      state.count++;
+  actions: ({ states, notify }) => ({
+    increment: () => {
+      states.count++;
     },
-    // Sync action with return
-    setUser: (state, payload: { name: string }) => {
-      state.user = payload;
-      return 'success';
+    incrementBy: (amount: number) => {
+      states.count += amount;
     },
-    // Async action with return
-    fetchUser: async (state, id: string) => {
-      const user = await api.getUser(id);
-      state.user = user;
-      return user;
+    async fetchCount() {
+      // Simulate an API call
+      const response = await new Promise<number>((resolve) =>
+        setTimeout(() => resolve(Math.floor(Math.random() * 100)), 500)
+      );
+      states.count = response;
+      return response;
     }
-  },
-  selectors: {}
+  })
 });
 ```
 
-## Basic Usage
+## Dispatching Actions
 
-```tsx
-// Sync action with no return
-store.dispatch.increment();
-
-// Sync action with return value
-const result = store.dispatch.setUser({ name: 'John' }); // 'success'
-```
-
-## Async Actions
-
-```tsx
-async function loadUser(id: string) {
-  // Returns the user from the async action
-  const user = await store.dispatch.fetchUser(id);
-  console.log('User loaded:', user);
-}
-```
-
-## Silent Dispatch
-
-For cases where you want to update state without triggering re-renders:
-
-```tsx
-// Using silentDispatch
-store.silentDispatch.increment();
-store.silentDispatch.setUser({ name: 'John' });
-
-// Async actions also work with silentDispatch
-await store.silentDispatch.fetchUser('123');
-```
-
-The return values work the same way with both `dispatch` and `silentDispatch`.
-
-# dispatch
-
-The `dispatch` object is how you execute actions to update the store's state.
-
-## How to Dispatch Actions
-
-Every action you define is available on `store.dispatch`. Call them as you would any other function.
+Call actions via the `dispatch` object. If your action takes arguments, pass them directly.
 
 ```ts
-// Call an action without arguments
+// Dispatch an action without arguments
 store.dispatch.increment();
 
-// Call an action with arguments
-store.dispatch.incrementBy(5);
+// Dispatch an action with an argument
+store.dispatch.incrementBy(10);
 ```
 
 ## Dispatching in React
 
-In your components, you can call `dispatch` directly in event handlers.
+In your components, it's common to destructure actions from `store.dispatch` and call them in event handlers.
 
 ```tsx
 function Counter() {
@@ -104,13 +83,39 @@ function Counter() {
 }
 ```
 
-## Async Actions
+## Async Actions with Immediate UI Updates
 
-When you dispatch an async action, it returns a `Promise` that resolves when the action completes.
+A powerful feature of `finalstore` is the ability to push immediate state updates in the middle of an async action, _before_ it fully completes. This is perfect for handling loading states.
+
+Call `notify()` right after you set the loading state. This will instantly re-render any subscribed components. The store will then notify subscribers again automatically when the entire async action is finished.
+
+```ts
+// In your store's actions:
+async fetchCount() {
+  states.isLoading = true;
+  notify(); // Immediately updates UI to show loading state
+
+  try {
+    const response = await new Promise<number>((resolve) =>
+      setTimeout(() => resolve(Math.floor(Math.random() * 100)), 500)
+    );
+    states.count = response;
+    return response;
+  } finally {
+    states.isLoading = false;
+    // Final notification happens automatically
+  }
+}
+```
+
+## Dispatching Async Actions
+
+When you dispatch an async action, it returns a `Promise` that resolves with the action's return value when it completes.
 
 ```ts
 async function handleFetch() {
-  await store.dispatch.fetchUser();
-  console.log('User fetched!');
+  console.log('Fetching new count...');
+  const newCount = await store.dispatch.fetchCount();
+  console.log(`New count is: ${newCount}`);
 }
 ```
