@@ -26,7 +26,7 @@ type ActionsContext<TState, TActions, TSelectors, TEvents> = (store: {
     payload: EventPayload<TEvents, TEventName>
   ) => void;
   notify: () => void;
-  invalidate: (selectorName: keyof TSelectors) => void;
+  invalidate: (selectorName: keyof TSelectors | (keyof TSelectors)[]) => void;
 }) => TActions;
 
 type SelectorsContext<TState, TSelectors> = (store: {
@@ -603,7 +603,59 @@ export function createStore<
   }
 
   // Invalidate function for cached selectors
-  function invalidate(selectorName: keyof TSelectors) {
+  function invalidate(selectorName: keyof TSelectors | (keyof TSelectors)[]) {
+    // Handle array of selector names
+    if (Array.isArray(selectorName)) {
+      let hasInvalidated = false;
+
+      selectorName.forEach((name) => {
+        const selectorNameStr = String(name);
+
+        if (isCachedSelector(selectorNameStr)) {
+          // Remove all cache entries for this selector
+          const keysToRemove: string[] = [];
+          for (const cacheKey of persistentSelectorCache.keys()) {
+            if (extractSelectorName(cacheKey) === selectorNameStr) {
+              keysToRemove.push(cacheKey);
+            }
+          }
+
+          keysToRemove.forEach((key) => persistentSelectorCache.delete(key));
+
+          // Re-compute and cache the selector with no arguments (base case)
+          if (selectors[name]) {
+            try {
+              const baseResult = (selectors[name] as any)();
+              const baseCacheKey = createSelectorCacheKey(selectorNameStr, []);
+
+              persistentSelectorCache.set(baseCacheKey, {
+                result: baseResult,
+                stateVersion: stateVersion + 1, // Use incremented version
+                lastUsed: Date.now(),
+                computeCount: 1
+              });
+
+              activeSelectorKeys.add(baseCacheKey);
+            } catch {
+              // Selector might require arguments, skip base case computation
+            }
+          }
+
+          hasInvalidated = true;
+        }
+      });
+
+      if (hasInvalidated) {
+        // Increment state version once for all invalidations
+        stateVersion++;
+        // Force notification once for all invalidations
+        scheduleNotification();
+      }
+
+      return;
+    }
+
+    // Handle single selector name
     const selectorNameStr = String(selectorName);
 
     if (!isCachedSelector(selectorNameStr)) {
