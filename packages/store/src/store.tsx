@@ -26,11 +26,14 @@ type ActionsContext<TState, TActions, TSelectors, TEvents> = (store: {
     payload: EventPayload<TEvents, TEventName>
   ) => void;
   notify: () => void;
+  invalidate: (selectorName: keyof TSelectors) => void;
 }) => TActions;
+
 type SelectorsContext<TState, TSelectors> = (store: {
   states: TState;
   selectors: TSelectors;
 }) => TSelectors;
+
 type StoreProps<
   TState,
   TActions,
@@ -40,6 +43,7 @@ type StoreProps<
   states: TState;
   actions?: ActionsContext<TState, TActions, TSelectors, TEvents>;
   selectors?: SelectorsContext<TState, TSelectors>;
+  cacheSelectors?: readonly (keyof TSelectors)[];
   config?: {
     name?: string;
     devtools?: boolean;
@@ -339,7 +343,12 @@ export function createStore<
   };
 
   const globalSelectorCache = new Map<string, SelectorCacheEntry>();
+  const persistentSelectorCache = new Map<string, SelectorCacheEntry>(); // Never auto-invalidated
   const activeSelectorKeys = new Set<string>(); // Track which selectors are actively used
+
+  // Cache configuration
+  const cachedSelectorNames = new Set(props.cacheSelectors || []);
+  const selectorSubscribers = new Map<string, Set<() => void>>(); // Per-selector subscribers
 
   // Cache key generation for selectors with arguments
   function createSelectorCacheKey(selectorName: string, args: any[]): string {
@@ -356,6 +365,26 @@ export function createStore<
     }
   }
 
+  // Extract selector name from cache key
+  function extractSelectorName(cacheKey: string): string {
+    const colonIndex = cacheKey.indexOf(':');
+    return colonIndex === -1 ? cacheKey : cacheKey.substring(0, colonIndex);
+  }
+
+  // Check if selector is cached
+  function isCachedSelector(selectorName: string): boolean {
+    return cachedSelectorNames.has(selectorName as keyof TSelectors);
+  }
+
+  // Get appropriate cache for selector
+  function getSelectorCache(
+    selectorName: string
+  ): Map<string, SelectorCacheEntry> {
+    return isCachedSelector(selectorName)
+      ? persistentSelectorCache
+      : globalSelectorCache;
+  }
+
   // Pre-compute all active selectors when state changes
   function updateGlobalSelectorCaches() {
     const currentStateVersion = stateVersion;
@@ -363,19 +392,22 @@ export function createStore<
     let updatedCount = 0;
 
     for (const cacheKey of activeSelectorKeys) {
+      const selectorName = extractSelectorName(cacheKey);
+
+      // Skip cached selectors - they are never auto-invalidated
+      if (isCachedSelector(selectorName)) {
+        continue;
+      }
+
       const cached = globalSelectorCache.get(cacheKey);
 
       // Only update if state version changed or cache doesn't exist
       if (!cached || cached.stateVersion !== currentStateVersion) {
         try {
-          // Parse selector name and arguments from cache key
-          const colonIndex = cacheKey.indexOf(':');
-          const selectorName =
-            colonIndex === -1 ? cacheKey : cacheKey.substring(0, colonIndex);
-
           if (selectors[selectorName as keyof TSelectors]) {
             let args: any[] = [];
 
+            const colonIndex = cacheKey.indexOf(':');
             if (colonIndex !== -1) {
               const argsStr = cacheKey.substring(colonIndex + 1);
               if (!argsStr.startsWith('fallback:')) {
@@ -413,7 +445,7 @@ export function createStore<
     // Optional: Log performance info in development
     if (typeof window !== 'undefined' && (window as any).__STORE_DEBUG__) {
       console.log(
-        `🔄 Updated ${updatedCount} selector caches for state version ${currentStateVersion}`
+        `🔄 Updated ${updatedCount} non-cached selector caches for state version ${currentStateVersion}`
       );
     }
   }
@@ -570,6 +602,53 @@ export function createStore<
     };
   }
 
+  // Invalidate function for cached selectors
+  function invalidate(selectorName: keyof TSelectors) {
+    const selectorNameStr = String(selectorName);
+
+    if (!isCachedSelector(selectorNameStr)) {
+      return; // Only cached selectors can be invalidated
+    }
+
+    // Remove all cache entries for this selector
+    const keysToRemove: string[] = [];
+    for (const cacheKey of persistentSelectorCache.keys()) {
+      if (extractSelectorName(cacheKey) === selectorNameStr) {
+        keysToRemove.push(cacheKey);
+      }
+    }
+
+    keysToRemove.forEach((key) => persistentSelectorCache.delete(key));
+
+    // Increment state version to trigger React re-renders for affected components
+    // This is necessary even though we're only invalidating cache, because React
+    // needs to detect that something changed to re-run the selector
+    stateVersion++;
+
+    // Re-compute and cache the selector with no arguments (base case)
+    if (selectors[selectorName]) {
+      try {
+        const baseResult = (selectors[selectorName] as any)();
+        const baseCacheKey = createSelectorCacheKey(selectorNameStr, []);
+
+        persistentSelectorCache.set(baseCacheKey, {
+          result: baseResult,
+          stateVersion,
+          lastUsed: Date.now(),
+          computeCount: 1
+        });
+
+        activeSelectorKeys.add(baseCacheKey);
+      } catch {
+        // Selector might require arguments, skip base case computation
+      }
+    }
+
+    // Force notification to update React components
+    // This ensures that components using this cached selector will re-render
+    scheduleNotification();
+  }
+
   // Initialize actions and selectors with provided functions or empty objects
   const actionProxy =
     (props?.actions as unknown as TActions) || ({} as TActions);
@@ -587,7 +666,8 @@ export function createStore<
           // Increment state version to bust selector cache and force immediate updates
           stateVersion++;
           notifySubscribers();
-        }
+        },
+        invalidate
       })
     : ({} as TActions);
 
@@ -658,6 +738,24 @@ export function createStore<
       ? memoizedSelector(getState())
       : initialSelector(getState());
 
+    // Track per-selector subscriptions for cached selectors
+    if (selector && typeof selector === 'function') {
+      // Try to extract selector name from the wrapped selector function
+      const selectorStr = selector.toString();
+      for (const selectorName of Object.keys(selectors)) {
+        if (
+          selectorStr.includes(selectorName) &&
+          isCachedSelector(selectorName)
+        ) {
+          if (!selectorSubscribers.has(selectorName)) {
+            selectorSubscribers.set(selectorName, new Set());
+          }
+          selectorSubscribers.get(selectorName)!.add(callback);
+          break;
+        }
+      }
+    }
+
     subscriberMap.set(id, {
       selector: initialSelector,
       memoizedSelector,
@@ -668,6 +766,20 @@ export function createStore<
 
     return () => {
       subscriberMap.delete(id);
+
+      // Clean up per-selector subscriptions
+      if (selector && typeof selector === 'function') {
+        const selectorStr = selector.toString();
+        for (const selectorName of Object.keys(selectors)) {
+          if (
+            selectorStr.includes(selectorName) &&
+            isCachedSelector(selectorName)
+          ) {
+            selectorSubscribers.get(selectorName)?.delete(callback);
+            break;
+          }
+        }
+      }
     };
   }
 
@@ -881,10 +993,14 @@ export function createStore<
       // Create a wrapper function that calls the original selector
       acc[key] = function (...args: any) {
         const cacheKey = createSelectorCacheKey(key, args);
+        const cache = getSelectorCache(key);
 
-        // Check global cache first for performance
-        const cached = globalSelectorCache.get(cacheKey);
-        if (cached && cached.stateVersion === stateVersion) {
+        // For cached selectors, check if cache exists regardless of state version
+        // For regular selectors, check state version too
+        const cached = cache.get(cacheKey);
+        const isCached = isCachedSelector(key);
+
+        if (cached && (isCached || cached.stateVersion === stateVersion)) {
           cached.lastUsed = Date.now();
           return cached.result;
         }
@@ -892,9 +1008,11 @@ export function createStore<
         // Fallback to direct computation and cache the result
         const result = (selectors[key as keyof TSelectors] as any)(...args);
 
-        globalSelectorCache.set(cacheKey, {
+        cache.set(cacheKey, {
           result,
-          stateVersion,
+          stateVersion: isCached
+            ? cached?.stateVersion || stateVersion
+            : stateVersion,
           lastUsed: Date.now(),
           computeCount: (cached?.computeCount || 0) + 1
         });
@@ -974,25 +1092,30 @@ export function createStore<
       // Create a wrapper function that calls the original selector
       acc[key] = function (...args: any) {
         const cacheKey = createSelectorCacheKey(key, args);
+        const cache = getSelectorCache(key);
+        const isCached = isCachedSelector(key);
 
         // Register this selector as actively used for pre-computation
         activeSelectorKeys.add(cacheKey);
 
-        // Create a wrapper that uses the global cache when possible
+        // Create a wrapper that uses the appropriate cache
         const wrappedSelector = (_state: TState) => {
-          // Check global cache first (should be pre-computed by notifySubscribers)
-          const cached = globalSelectorCache.get(cacheKey);
-          if (cached && cached.stateVersion === stateVersion) {
+          // Check cache first (persistent cache for cached selectors, regular cache for others)
+          const cached = cache.get(cacheKey);
+
+          if (cached && (isCached || cached.stateVersion === stateVersion)) {
             cached.lastUsed = Date.now();
             return cached.result;
           }
 
-          // Fallback computation if cache miss (shouldn't happen often)
+          // Fallback computation if cache miss
           const result = (selectors[key as keyof TSelectors] as any)(...args);
 
-          globalSelectorCache.set(cacheKey, {
+          cache.set(cacheKey, {
             result,
-            stateVersion,
+            stateVersion: isCached
+              ? cached?.stateVersion || stateVersion
+              : stateVersion,
             lastUsed: Date.now(),
             computeCount: (cached?.computeCount || 0) + 1
           });
