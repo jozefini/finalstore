@@ -1,75 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { createMap, createStore } from './index';
 
-const storeStates = {
-  taskId: 1,
-  theme: 'light' as 'light' | 'dark',
-  count: 0,
-  text: 'Hello'
-};
-type StoreStates = typeof storeStates;
-type StoreActions = {
-  incrementTaskId: () => void;
-  resetTaskId: () => void;
-  toggleTheme: () => void;
-  increment: () => void;
-  decrement: () => void;
-  setText: (text: string) => void;
-};
-type StoreSelectors = {
-  getText: () => string;
-  isTheme: (theme: 'light' | 'dark') => boolean;
-};
-type StoreEvents = {
-  toDarkMode: undefined;
-  themeChange: { theme: 'light' | 'dark' };
-  countChange: { count: number };
-  textChange: { text: string };
-};
-
-export const store = createStore<
-  StoreStates,
-  StoreActions,
-  StoreSelectors,
-  StoreEvents
->({
-  states: storeStates,
-  actions: ({ states, trigger }) => ({
-    incrementTaskId: () => {
-      states.taskId++;
-    },
-    resetTaskId: () => {
-      states.taskId = 1;
-    },
-    toggleTheme: () => {
-      states.theme = states.theme === 'light' ? 'dark' : 'light';
-      trigger('themeChange', { theme: states.theme });
-    },
-    increment: () => {
-      states.count++;
-      trigger('countChange', { count: states.count });
-    },
-    decrement: () => {
-      states.count--;
-    },
+const store = createStore({
+  states: {
+    text: ''
+  },
+  actions: ({ states }) => ({
     setText: (text: string) => {
       states.text = text;
     }
   }),
   selectors: ({ states }) => ({
-    getText: () => {
-      return states.text;
-    },
-    isTheme: (payload: 'light' | 'dark') => {
-      return states.theme === payload;
-    }
+    text: () => states.text
   })
 });
 
-const collection = createMap<
+export const collection = createMap<
   {
     text: string;
     completed: boolean;
@@ -79,6 +28,7 @@ const collection = createMap<
     text: (text: string) => void;
   },
   {
+    text: () => string;
     isCompleted: () => boolean;
   }
 >({
@@ -86,7 +36,7 @@ const collection = createMap<
     text: '',
     completed: false
   },
-  actions: ({ states, actions, selectors }) => ({
+  actions: ({ states }) => ({
     toggle: () => {
       states.completed = !states.completed;
     },
@@ -94,8 +44,13 @@ const collection = createMap<
       states.text = text;
     }
   }),
-  selectors: ({ states, selectors }) => ({
+  selectors: ({ states }) => ({
+    text: () => {
+      console.log('selectors.text');
+      return states.text;
+    },
     isCompleted: () => {
+      console.log('selectors.isCompleted');
       return states.completed;
     }
   })
@@ -103,7 +58,7 @@ const collection = createMap<
 
 // Isolated checkbox component - only re-renders when completed state changes
 const TodoCheckbox = ({ id }: { id: string }) => {
-  const completed = collection.key(id).use((s) => s.completed);
+  const completed = collection.key(id).use.isCompleted();
 
   return (
     <input
@@ -117,8 +72,9 @@ const TodoCheckbox = ({ id }: { id: string }) => {
 
 // Isolated text display - only re-renders when text or completed state changes
 const TodoTextDisplay = ({ id }: { id: string }) => {
-  const text = collection.key(id).use((s) => s.text);
-  const completed = collection.key(id).use((s) => s.completed);
+  // const text = collection.key(id).use((s) => s.text);
+  const text = store.use.text();
+  const completed = collection.key(id).use.isCompleted();
 
   return (
     <span
@@ -131,7 +87,7 @@ const TodoTextDisplay = ({ id }: { id: string }) => {
 
 // Isolated toggle button - only re-renders when completed state changes
 const TodoToggleButton = ({ id }: { id: string }) => {
-  const completed = collection.key(id).use((s) => s.completed);
+  const completed = collection.key(id).use.isCompleted();
 
   return (
     <button
@@ -157,13 +113,17 @@ const TodoDeleteButton = ({ id }: { id: string }) => {
 
 // Isolated text input - only re-renders when text state changes
 const TodoTextInput = ({ id }: { id: string }) => {
-  const text = collection.key(id).use((s) => s.text);
+  // const text = collection.key(id).use((s) => s.text);
+  const text = store.use.text();
 
   return (
     <input
       type="text"
       value={text}
-      onChange={(e) => collection.key(id).dispatch.text(e.target.value)}
+      onChange={(e) => {
+        // collection.key(id).dispatch.text(e.target.value)
+        store.dispatch.setText(e.target.value);
+      }}
       placeholder="Update text"
       className="block w-full flex-1 rounded-md border-gray-300 bg-gray-50 p-2 text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
     />
@@ -206,66 +166,6 @@ const TodoItem = ({ id }: { id: string }) => {
         <TodoTextInput id={id} />
         <TodoUpdateButton id={id} />
       </div>
-    </div>
-  );
-};
-
-const TodoList = () => {
-  const currentId = useRef(0);
-  const todos = collection.useKeys();
-  const total = collection.useSize();
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h3 className="text-lg font-medium text-gray-900">Todos ({total})</h3>
-        <button
-          onClick={() => {
-            const key = currentId.current.toString();
-            collection.key(key).set({
-              text: `New Todo ${key}`,
-              completed: false
-            });
-            currentId.current++;
-          }}
-          className="rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-        >
-          Add New Todo
-        </button>
-      </div>
-
-      {total === 0 ? (
-        <div className="rounded-md bg-gray-100 py-8 text-center text-gray-500">
-          No todos yet. Add one to get started!
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {todos.map((id) => (
-            <TodoItem key={id} id={id} />
-          ))}
-
-          <div className="mt-4 flex justify-between border-t border-gray-200 pt-4">
-            <button
-              onClick={() => {
-                collection.batch(() => {
-                  todos.forEach((id) => {
-                    collection.key(id).dispatch.toggle();
-                  });
-                });
-              }}
-              className="rounded-md bg-gray-100 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-200"
-            >
-              Toggle All Todos
-            </button>
-            <button
-              onClick={() => collection.clear()}
-              className="rounded-md bg-red-100 px-4 py-2 text-red-700 transition-colors hover:bg-red-200"
-            >
-              Clear All Todos
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
