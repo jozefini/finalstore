@@ -682,70 +682,15 @@ export function createMap<
   // Hooks and Methods
   // =====================
 
-  function useKey<T>(key: string, selector?: (state: TState) => T): TState | T {
-    const stateRef = useRef(states.get(key));
-    const selectorRef = useRef(selector);
-    const stateVersionRef = useRef(stateVersion);
-
-    console.log(
-      `[${key}] useKey execution, stateVersion: ${stateVersion}, current: ${stateVersionRef.current}`
-    );
-
-    const valueRef = useRef<T | TState | undefined>(
-      selector && stateRef.current
-        ? selector(stateRef.current)
-        : stateRef.current
-    );
-
-    // Update refs when selector changes
-    if (selector !== selectorRef.current) {
-      console.log(`[${key}] Selector changed in useKey`);
-      selectorRef.current = selector;
-      stateRef.current = states.get(key);
-      stateVersionRef.current = stateVersion;
-      valueRef.current =
-        selector && stateRef.current
-          ? selector(stateRef.current)
-          : stateRef.current;
-    }
-
-    const subscribeFn = useCallback(
-      (callback: () => void) => {
-        console.log(`[${key}] Setting up subscription`);
-        return subscribeToKey(key, callback, selectorRef.current);
-      },
-      [key]
-    );
-
-    const getSnapshot = useCallback(() => {
-      const currentState = states.get(key);
-      const hasStateChanged = stateVersion !== stateVersionRef.current;
-
-      console.log(
-        `[${key}] getSnapshot, hasStateChanged: ${hasStateChanged}, stateVersion: ${stateVersion}`
-      );
-
-      if (hasStateChanged || currentState !== stateRef.current) {
-        stateRef.current = currentState;
-        stateVersionRef.current = stateVersion;
-        valueRef.current =
-          selectorRef.current && currentState
-            ? selectorRef.current(currentState)
-            : currentState;
-
-        console.log(
-          `[${key}] State updated in getSnapshot, new value:`,
-          valueRef.current
-        );
-      }
-
-      return valueRef.current;
-    }, [key]);
-
-    return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot) as
-      | T
-      | TState;
-  }
+  // Cache selector methods to avoid recreating them for each key
+  const selectorMethodsCache = new Map<
+    string,
+    MapSelectorMethods<TState, TSelectors>
+  >();
+  const useSelectorMethodsCache = new Map<
+    string,
+    MapSelectorMethods<TState, TSelectors>
+  >();
 
   function useSize() {
     return useSyncExternalStore(
@@ -777,36 +722,136 @@ export function createMap<
     return Array.from(states.keys());
   }
 
-  // Create key-specific actions that update with fresh state
-  function createKeyDispatch(key: string) {
+  // Keep only this optimized version of createSelectorMethods
+  function createSelectorMethods(
+    key: string,
+    useHook?: boolean
+  ): MapSelectorMethods<TState, TSelectors> {
+    // Check cache first
+    const cache = useHook ? useSelectorMethodsCache : selectorMethodsCache;
+    if (cache.has(key)) {
+      return cache.get(key)!;
+    }
+
+    if (!selectors) return {} as MapSelectorMethods<TState, TSelectors>;
+
+    const methods = Object.keys(selectors).reduce<
+      MapSelectorMethods<TState, TSelectors>
+    >(
+      (acc, selectorKey) => {
+        const selector = selectors[selectorKey];
+        if (!selector) return acc;
+
+        const typedKey = selectorKey as keyof TSelectors;
+
+        (acc as Record<keyof TSelectors, (payload?: AnyType) => AnyType>)[
+          typedKey
+        ] = (() => {
+          if (useHook) {
+            // Create a memoized selector for hooks to prevent unnecessary recalculations
+            const memoizedSelector = (state: TState) => {
+              const result = selector({
+                states: state,
+                selectors: selectorProxy
+              })[typedKey];
+              return result;
+            };
+
+            return useKey(key, memoizedSelector);
+          }
+
+          // For direct access, get the current state and apply selector
+          const state = states.get(key);
+          if (!state) return undefined;
+
+          const result = selector({ states: state, selectors: selectorProxy })[
+            typedKey
+          ];
+          return result;
+        }) as TSelectors[keyof TSelectors];
+
+        return acc;
+      },
+      {} as MapSelectorMethods<TState, TSelectors>
+    );
+
+    // Cache the created methods
+    cache.set(key, methods);
+    return methods;
+  }
+
+  // Optimize useKey with better memoization
+  function useKey<T>(key: string, selector?: (state: TState) => T): TState | T {
+    const stateRef = useRef(states.get(key));
+    const selectorRef = useRef(selector);
+    const stateVersionRef = useRef(stateVersion);
+    const valueRef = useRef<T | TState | undefined>(
+      selector && stateRef.current
+        ? selector(stateRef.current)
+        : stateRef.current
+    );
+
+    // Memoize the subscription callback
+    const subscribeFn = useCallback(
+      (callback: () => void) =>
+        subscribeToKey(key, callback, selectorRef.current),
+      [key]
+    );
+
+    // Memoize the snapshot getter with proper dependencies
+    const getSnapshot = useCallback(() => {
+      const currentState = states.get(key);
+      const hasStateChanged = stateVersion !== stateVersionRef.current;
+
+      if (hasStateChanged || currentState !== stateRef.current) {
+        stateRef.current = currentState;
+        stateVersionRef.current = stateVersion;
+        valueRef.current =
+          selectorRef.current && currentState
+            ? selectorRef.current(currentState)
+            : currentState;
+      }
+
+      return valueRef.current;
+    }, [key, stateVersion]); // Add stateVersion as dependency for proper updates
+
+    return useSyncExternalStore(subscribeFn, getSnapshot, getSnapshot) as
+      | T
+      | TState;
+  }
+
+  // Create a shared dispatcher map to avoid creating new dispatchers per key
+  const dispatchersByKey = new Map<string, TActions>();
+
+  // Optimize key-specific actions with caching
+  function createKeyDispatch(key: string): TActions {
+    // Check cache first
+    if (dispatchersByKey.has(key)) {
+      return dispatchersByKey.get(key)!;
+    }
+
     if (!actions) return {} as TActions;
 
-    return Object.keys(actions).reduce(
+    const dispatcher = Object.keys(actions).reduce(
       (acc, actionKey) => {
         const typedKey = actionKey as keyof TActions;
 
         acc[typedKey] = ((...args: any[]) => {
-          // Get the current state for this key
           const currentState = states.get(key);
           if (!currentState) return;
 
-          // For optimized performance, we'll mutate directly but track the state
-          // We'll create a new reference right before notification
           const stateClone = { ...currentState };
           let modified = false;
 
-          // ⭐️ DIRECT IMPLEMENTATION OF ACTIONS ⭐️
+          // Optimized direct implementation of common actions
           if (typedKey === ('toggle' as keyof TActions)) {
-            // Handle toggle action directly
             (stateClone as any).completed = !(stateClone as any).completed;
             modified = true;
           } else if (typedKey === ('text' as keyof TActions)) {
-            // Handle text action directly
             const textValue = args[0];
             (stateClone as any).text = textValue;
             modified = true;
           } else {
-            // Handle any other action with original implementation
             (actions[typedKey] as any)(
               {
                 states: stateClone,
@@ -816,15 +861,12 @@ export function createMap<
               },
               ...args
             );
-            // Assume the state was modified
             modified = true;
           }
 
-          // Only update if something changed
           if (modified) {
-            // Set the modified state back to the store
             states.set(key, stateClone);
-            stateVersion++; // Increment state version on modification
+            stateVersion++;
 
             if (devTools && !pauseDevTools) {
               devTools.send(
@@ -836,7 +878,6 @@ export function createMap<
             scheduleNotification(key);
           }
 
-          // For compatibility, call the original action but ignore its return value
           return (actions[typedKey] as any)(
             {
               states: currentState,
@@ -852,36 +893,31 @@ export function createMap<
       },
       {} as Record<keyof TActions, ActionType>
     ) as TActions;
+
+    // Cache the dispatcher
+    dispatchersByKey.set(key, dispatcher);
+    return dispatcher;
   }
 
-  // Create a shared dispatcher map to avoid creating new dispatchers per key
-  const dispatchersByKey = new Map<string, TActions>();
-
-  // Run multiple actions in a batch with a single notification at the end
+  // Optimize batch operations
   function batchActions(callback: () => void) {
     const prevStateEntries = new Map(states.entries());
+    const changedKeys = new Set<string>();
+    let hasRemovedKeys = false;
 
     batch(
       () => {
-        // Execute the batched actions
         callback();
       },
       () => {
-        // Determine what changed by comparing before and after states
-        const changedKeys = new Set<string>();
-        let hasRemovedKeys = false;
-
-        // Check for modified or added keys
+        // Efficiently track changes
         for (const [key, state] of states.entries()) {
           const prevState = prevStateEntries.get(key);
-
-          // If this is a new key or the key's state has changed
           if (!prevState || !checkEquality(prevState, state)) {
             changedKeys.add(key);
           }
         }
 
-        // Check for removed keys
         for (const key of prevStateEntries.keys()) {
           if (!states.has(key)) {
             changedKeys.add(key);
@@ -889,9 +925,8 @@ export function createMap<
           }
         }
 
-        // Notify only if something changed
         if (changedKeys.size > 0 || hasRemovedKeys) {
-          // Schedule notifications for all changed keys
+          stateVersion++;
           for (const key of changedKeys) {
             scheduleNotification(key);
           }
@@ -925,76 +960,6 @@ export function createMap<
     return function use<T>(selector?: (state: TState) => T): TState | T {
       return useKey(key, selector);
     };
-  }
-
-  // Create selector methods for both get and use
-  function createSelectorMethods(
-    key: string,
-    useHook?: boolean
-  ): MapSelectorMethods<TState, TSelectors> {
-    if (!selectors) return {} as MapSelectorMethods<TState, TSelectors>;
-
-    return Object.keys(selectors).reduce<
-      MapSelectorMethods<TState, TSelectors>
-    >(
-      (acc, selectorKey) => {
-        const selector = selectors[selectorKey];
-        if (!selector) return acc;
-
-        const typedKey = selectorKey as keyof TSelectors;
-        console.log(
-          `Creating selector method for: ${String(typedKey)}, useHook: ${useHook}`
-        );
-
-        (acc as Record<keyof TSelectors, (payload?: AnyType) => AnyType>)[
-          typedKey
-        ] = (() => {
-          if (useHook) {
-            console.log(
-              `[${key}] Hook selector execution for: ${String(typedKey)}`
-            );
-            // For hooks, create a selector that directly accesses the state property
-            return useKey(key, (state: TState) => {
-              console.log(
-                `[${key}] Hook selector computation for: ${String(typedKey)}`,
-                state
-              );
-              // Call the selector with the state directly
-              const result = selector({
-                states: state,
-                selectors: selectorProxy
-              })[typedKey];
-              console.log(
-                `[${key}] Hook selector result for: ${String(typedKey)}:`,
-                result
-              );
-              return result;
-            });
-          }
-
-          // For direct access, get the current state and apply selector
-          const state = states.get(key);
-          console.log(
-            `[${key}] Direct selector execution for: ${String(typedKey)}`,
-            state
-          );
-          if (!state) return undefined;
-
-          // Call the selector with the state directly
-          const result = selector({ states: state, selectors: selectorProxy })[
-            typedKey
-          ];
-          console.log(
-            `[${key}] Direct selector result for: ${String(typedKey)}:`,
-            result
-          );
-          return result;
-        }) as TSelectors[keyof TSelectors];
-
-        return acc;
-      },
-      {} as MapSelectorMethods<TState, TSelectors>
-    );
   }
 
   // Create a shared selector map to avoid creating new selectors per key
