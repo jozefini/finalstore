@@ -170,6 +170,108 @@ export function createMap<
   // Track which keys need to be updated with new references
   const pendingReferenceUpdates = new Set<string>();
 
+  // Add state version tracking at the top with other state management
+  let stateVersion = 0;
+  const selectorCache = new WeakMap();
+
+  function createReactiveProxy<T>(
+    obj: T,
+    onMutate?: (
+      target: any,
+      key: string | symbol,
+      newVal: any,
+      oldVal: any
+    ) => void
+  ): T {
+    const proxyCache = new WeakMap();
+
+    function wrap(value: any): any {
+      if (typeof value !== 'object' || value === null) return value;
+
+      // Already proxied?
+      if (proxyCache.has(value)) return proxyCache.get(value);
+
+      // Don't proxy certain built-in objects and special collections
+      if (
+        value instanceof Date ||
+        value instanceof RegExp ||
+        value instanceof Error ||
+        value instanceof Map ||
+        value instanceof Set ||
+        value instanceof WeakMap ||
+        value instanceof WeakSet ||
+        ArrayBuffer.isView(value)
+      ) {
+        return value;
+      }
+
+      const proxy = new Proxy(value, {
+        get(target, key, receiver) {
+          const result = Reflect.get(target, key, receiver);
+          // Only wrap the result if it's not a function (to avoid breaking methods)
+          return typeof result === 'function' ? result : wrap(result);
+        },
+        set(target, key, newValue, receiver) {
+          const oldValue = target[key];
+          const result = Reflect.set(target, key, newValue, receiver);
+          if (oldValue !== newValue && onMutate) {
+            onMutate(target, key, newValue, oldValue);
+          }
+          return result;
+        },
+        deleteProperty(target, key) {
+          const hadKey = Object.prototype.hasOwnProperty.call(target, key);
+          const oldValue = hadKey ? target[key] : undefined;
+          const result = Reflect.deleteProperty(target, key);
+          if (hadKey && onMutate) {
+            onMutate(target, key, undefined, oldValue);
+          }
+          return result;
+        }
+      });
+
+      proxyCache.set(value, proxy);
+      return proxy;
+    }
+
+    return wrap(obj);
+  }
+
+  // Modify the proxy notification to increment state version
+  const statesProxy = createReactiveProxy(
+    states,
+    (
+      target: unknown,
+      key: string | symbol,
+      newVal: unknown,
+      oldVal: unknown
+    ) => {
+      if (newVal !== oldVal) {
+        stateVersion++;
+        if (!isBatching()) {
+          scheduleNotification(key.toString());
+        }
+      }
+    }
+  );
+
+  function memoizeSelector<T>(
+    selector: (state: TState) => T
+  ): (state: TState) => T {
+    return (state: TState) => {
+      const cache = selectorCache.get(selector);
+      if (!cache || cache.lastStateVersion !== stateVersion) {
+        const result = selector(state);
+        selectorCache.set(selector, {
+          lastStateVersion: stateVersion,
+          lastResult: result
+        });
+        return result;
+      }
+      return cache.lastResult as T;
+    };
+  }
+
   // Special function to create a new state reference without full deep cloning
   const createStateReference = (state: TState): TState => {
     return Object.assign({}, state);
@@ -190,7 +292,7 @@ export function createMap<
   };
 
   // Create batcher for update batching
-  const { batch } = createBatcher();
+  const { batch, shouldNotify: isBatching } = createBatcher();
 
   // Throttled notification mechanism with a reasonable default (16ms is roughly 60fps)
   const notificationThrottle = 16;
@@ -327,6 +429,8 @@ export function createMap<
         hasChanged = true;
         // Update the state reference directly
         stateRef[prop as keyof TState] = value;
+        // Increment state version on modification
+        stateVersion++;
         return true;
       }
     });
@@ -481,10 +585,17 @@ export function createMap<
 
   function set(key: string, state: TState) {
     const hadKey = states.has(key);
+    console.log(`[${key}] Setting state, stateVersion before: ${stateVersion}`);
 
     // Always create a new state reference for reactivity
     const newState = Object.assign({}, props.states, state);
     states.set(key, newState);
+    stateVersion++; // Increment state version on set
+
+    console.log(
+      `[${key}] State set, new stateVersion: ${stateVersion}, new state:`,
+      newState
+    );
 
     // Send to DevTools
     if (devTools && !pauseDevTools) {
@@ -503,6 +614,7 @@ export function createMap<
 
   function remove(key: string) {
     const hadKey = states.delete(key);
+    stateVersion++; // Increment state version on remove
 
     // Send to DevTools
     if (devTools && !pauseDevTools) {
@@ -521,6 +633,7 @@ export function createMap<
 
   function clear() {
     const wasEmpty = states.size === 0;
+    stateVersion++; // Increment state version on clear
 
     // Get all keys for notification before clearing
     const keysToNotify = wasEmpty ? [] : Array.from(states.keys());
@@ -548,6 +661,7 @@ export function createMap<
   function reset() {
     const hadItems = states.size > 0;
     const hasInitialItems = initialMap.size > 0;
+    stateVersion++; // Increment state version on reset
 
     states.clear();
     states = new Map<string, TState>(initialMap);
@@ -571,6 +685,12 @@ export function createMap<
   function useKey<T>(key: string, selector?: (state: TState) => T): TState | T {
     const stateRef = useRef(states.get(key));
     const selectorRef = useRef(selector);
+    const stateVersionRef = useRef(stateVersion);
+
+    console.log(
+      `[${key}] useKey execution, stateVersion: ${stateVersion}, current: ${stateVersionRef.current}`
+    );
+
     const valueRef = useRef<T | TState | undefined>(
       selector && stateRef.current
         ? selector(stateRef.current)
@@ -579,8 +699,10 @@ export function createMap<
 
     // Update refs when selector changes
     if (selector !== selectorRef.current) {
+      console.log(`[${key}] Selector changed in useKey`);
       selectorRef.current = selector;
       stateRef.current = states.get(key);
+      stateVersionRef.current = stateVersion;
       valueRef.current =
         selector && stateRef.current
           ? selector(stateRef.current)
@@ -589,6 +711,7 @@ export function createMap<
 
     const subscribeFn = useCallback(
       (callback: () => void) => {
+        console.log(`[${key}] Setting up subscription`);
         return subscribeToKey(key, callback, selectorRef.current);
       },
       [key]
@@ -596,14 +719,24 @@ export function createMap<
 
     const getSnapshot = useCallback(() => {
       const currentState = states.get(key);
-      const hasStateChanged = currentState !== stateRef.current;
+      const hasStateChanged = stateVersion !== stateVersionRef.current;
 
-      if (hasStateChanged || valueRef.current === undefined) {
+      console.log(
+        `[${key}] getSnapshot, hasStateChanged: ${hasStateChanged}, stateVersion: ${stateVersion}`
+      );
+
+      if (hasStateChanged || currentState !== stateRef.current) {
         stateRef.current = currentState;
+        stateVersionRef.current = stateVersion;
         valueRef.current =
           selectorRef.current && currentState
             ? selectorRef.current(currentState)
             : currentState;
+
+        console.log(
+          `[${key}] State updated in getSnapshot, new value:`,
+          valueRef.current
+        );
       }
 
       return valueRef.current;
@@ -691,6 +824,7 @@ export function createMap<
           if (modified) {
             // Set the modified state back to the store
             states.set(key, stateClone);
+            stateVersion++; // Increment state version on modification
 
             if (devTools && !pauseDevTools) {
               devTools.send(
@@ -799,6 +933,7 @@ export function createMap<
     useHook?: boolean
   ): MapSelectorMethods<TState, TSelectors> {
     if (!selectors) return {} as MapSelectorMethods<TState, TSelectors>;
+
     return Object.keys(selectors).reduce<
       MapSelectorMethods<TState, TSelectors>
     >(
@@ -807,17 +942,55 @@ export function createMap<
         if (!selector) return acc;
 
         const typedKey = selectorKey as keyof TSelectors;
+        console.log(
+          `Creating selector method for: ${String(typedKey)}, useHook: ${useHook}`
+        );
+
         (acc as Record<keyof TSelectors, (payload?: AnyType) => AnyType>)[
           typedKey
-        ] = ((payload?: AnyType) => {
+        ] = (() => {
+          if (useHook) {
+            console.log(
+              `[${key}] Hook selector execution for: ${String(typedKey)}`
+            );
+            // For hooks, create a selector that directly accesses the state property
+            return useKey(key, (state: TState) => {
+              console.log(
+                `[${key}] Hook selector computation for: ${String(typedKey)}`,
+                state
+              );
+              // Call the selector with the state directly
+              const result = selector({
+                states: state,
+                selectors: selectorProxy
+              })[typedKey];
+              console.log(
+                `[${key}] Hook selector result for: ${String(typedKey)}:`,
+                result
+              );
+              return result;
+            });
+          }
+
+          // For direct access, get the current state and apply selector
           const state = states.get(key);
+          console.log(
+            `[${key}] Direct selector execution for: ${String(typedKey)}`,
+            state
+          );
           if (!state) return undefined;
 
-          if (useHook) {
-            return useKey(key, (s: TState) => selector(s, payload));
-          }
-          return selector(state, payload);
+          // Call the selector with the state directly
+          const result = selector({ states: state, selectors: selectorProxy })[
+            typedKey
+          ];
+          console.log(
+            `[${key}] Direct selector result for: ${String(typedKey)}:`,
+            result
+          );
+          return result;
         }) as TSelectors[keyof TSelectors];
+
         return acc;
       },
       {} as MapSelectorMethods<TState, TSelectors>
