@@ -488,18 +488,12 @@ export function createMap<
 
   function notifyKeysSubscribers() {
     const currentKeys = Array.from(states.keys());
-    const callbacks = new Set<() => void>();
-
     for (const sub of subscribers.keys.values()) {
-      if (!checkEquality(currentKeys, sub.lastValue)) {
-        sub.lastValue = currentKeys;
-        callbacks.add(sub.callback);
+      const newValue = currentKeys;
+      if (!checkEquality(newValue, sub.lastValue)) {
+        sub.lastValue = [...newValue]; // Create new array to ensure reference change
+        sub.callback();
       }
-    }
-
-    if (callbacks.size > 0) {
-      pendingNotifications.set('__keys__', callbacks);
-      scheduleNotifications();
     }
   }
 
@@ -711,15 +705,17 @@ export function createMap<
 
   function useKeys() {
     const keysRef = useRef<string[]>([]);
-    const versionRef = useRef(-1);
+    const stateVersionRef = useRef(globalStateVersion);
 
     const getSnapshot = useCallback(() => {
-      if (globalStateVersion !== versionRef.current) {
-        const currentKeys = Array.from(states.keys());
-        if (!checkEquality(currentKeys, keysRef.current)) {
-          keysRef.current = currentKeys;
-        }
-        versionRef.current = globalStateVersion;
+      const currentKeys = Array.from(states.keys());
+      const hasChanged =
+        globalStateVersion !== stateVersionRef.current ||
+        !checkEquality(currentKeys, keysRef.current);
+
+      if (hasChanged) {
+        keysRef.current = currentKeys;
+        stateVersionRef.current = globalStateVersion;
       }
       return keysRef.current;
     }, []);
@@ -785,14 +781,39 @@ export function createMap<
     return dispatcher;
   }
 
-  // Batch operations with optimized notification
+  // Optimize batch operations
   function batchActions(callback: () => void) {
-    batch(callback, () => {
-      // Process all pending notifications at once
-      if (pendingNotifications.size > 0) {
-        processNotificationBatch();
+    const initialKeys = Array.from(states.keys());
+    const initialSize = states.size;
+
+    batch(
+      () => {
+        callback();
+      },
+      () => {
+        const currentKeys = Array.from(states.keys());
+        const keysChanged = !checkEquality(initialKeys, currentKeys);
+        const sizeChanged = initialSize !== states.size;
+
+        if (keysChanged || sizeChanged) {
+          globalStateVersion++;
+          // Force immediate notification for keys and size changes
+          subscribers.keys.forEach((sub) => {
+            sub.lastValue = currentKeys;
+            sub.callback();
+          });
+          subscribers.size.forEach((sub) => {
+            sub.lastValue = states.size;
+            sub.callback();
+          });
+        }
+
+        // Notify individual key changes
+        currentKeys.forEach((key) => {
+          notifyKeySubscribers(key);
+        });
       }
-    });
+    );
   }
 
   // Memoized selectors
