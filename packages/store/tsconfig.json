@@ -3,7 +3,8 @@
   "include": [
     ".",
     ".eslintrc.js",
-    "../../apps/docs/app/(home)/store-ui-tests.tsx"
+    "../../apps/docs/app/(home)/store-ui-tests.tsx",
+    "../../apps/docs/app/(home)/components/ui/storeTest.tsx"
   ],
   "exclude": ["dist", "node_modules"]
 }

@@ -681,51 +681,58 @@ export function createMap<
   // Optimized action dispatch with memoization
   const dispatcherCache = new Map<string, TActions>();
 
-  function createKeyDispatch(key: string): TActions {
+  // Create key-specific actions that update with fresh state
+  function createKeyDispatch(key: string) {
     if (!actions) return {} as TActions;
 
-    // Check cache first
-    const cached = dispatcherCache.get(key);
-    if (cached) return cached;
+    return Object.keys(actions).reduce(
+      (acc, actionKey) => {
+        const typedKey = actionKey as keyof TActions;
 
-    const dispatcher = Object.keys(actions).reduce((acc, actionKey) => {
-      const typedKey = actionKey as keyof TActions;
+        acc[typedKey] = ((...args: any[]) => {
+          // Get the current state for this key
+          const currentState = states.get(key);
+          if (!currentState) return;
 
-      acc[typedKey] = ((...args: any[]) => {
-        const currentState = states.get(key);
-        if (!currentState) return;
+          // Create a new state reference for the action
+          const stateClone = { ...currentState };
 
-        // Fast path for common actions
-        if (typedKey === 'toggle' || typedKey === 'text') {
-          const newState = { ...currentState };
+          // Create a proxy to track mutations
+          const stateProxy = new Proxy(stateClone, {
+            set: (target, prop, value) => {
+              target[prop as keyof TState] = value;
+              return true;
+            }
+          });
 
-          if (typedKey === 'toggle') {
-            (newState as any).completed = !(newState as any).completed;
-          } else if (typedKey === 'text') {
-            (newState as any).text = args[0];
+          // Execute the action with the proxied state
+          const actionContext = {
+            states: stateProxy,
+            actions: actionProxy,
+            selectors: selectorProxy,
+            map: mapProxy
+          };
+
+          (actions[typedKey] as any)(actionContext, ...args);
+
+          // Set the modified state back to the store
+          states.set(key, stateClone);
+          stateVersion++;
+
+          if (devTools && !pauseDevTools) {
+            devTools.send(
+              { type: `${String(actionKey)}@${key}`, payload: args[0] },
+              Object.fromEntries(states)
+            );
           }
 
-          set(key, newState);
-          return;
-        }
+          notifyKeySubscribers(key);
+        }) as TActions[keyof TActions];
 
-        // Generic action handling
-        const context = createActionContext(currentState);
-        const result = (actions[typedKey] as any)(context, ...args);
-
-        const { state: newState, hasChanged } = context.getState();
-        if (hasChanged) {
-          set(key, newState);
-        }
-
-        return result;
-      }) as TActions[keyof TActions];
-
-      return acc;
-    }, {} as TActions);
-
-    dispatcherCache.set(key, dispatcher);
-    return dispatcher;
+        return acc;
+      },
+      {} as Record<keyof TActions, ActionType>
+    ) as TActions;
   }
 
   // Optimize batch operations to match individual set behavior

@@ -1,6 +1,8 @@
+'use client';
+
 import { useRef } from 'react';
 
-import { createMap } from './map';
+import { createMap } from '../../../../../../packages/store/src/map';
 
 type States = {
   text: string;
@@ -14,65 +16,62 @@ type Selectors = {
   text: () => string;
   isCompleted: () => boolean;
 };
-type MapSelectors = {
-  completedTasks: () => States[];
-  pendingTasks: () => States[];
-  totalTasks: () => number;
-};
+// type MapSelectors = {
+//   completedTasks: () => States[];
+//   pendingTasks: () => States[];
+//   totalTasks: () => number;
+// };
 
-export const collection = createMap<States, Actions, Selectors, MapSelectors>({
+export const collection = createMap<States, Actions, Selectors>({
   states: {
     text: '',
-    completed: false
+    completed: true
   },
-  actions: ({ states, invalidate, invalidateMap }) => ({
+  actions: ({ states }) => ({
     toggle: () => {
       states.completed = !states.completed;
-      invalidate('isCompleted');
-      invalidateMap(['completedTasks', 'pendingTasks']);
+      // invalidate('isCompleted');
+      // invalidateMap(['completedTasks', 'pendingTasks']);
     },
     text: (text: string) => {
       states.text = text;
-      invalidate('text');
+      // invalidate('text');
     }
   }),
-  cacheSelectors: ['text', 'isCompleted'],
-  cacheMapSelectors: ['completedTasks', 'pendingTasks', 'totalTasks'],
+  // cacheSelectors: ['text', 'isCompleted'],
+  // cacheMapSelectors: ['completedTasks', 'pendingTasks', 'totalTasks'],
   selectors: ({ states }) => ({
     text: () => {
-      console.log('selectors.text');
       return states.text;
     },
     isCompleted: () => {
-      console.log('selectors.isCompleted');
       return states.completed;
     }
   }),
-  mapSelectors: ({ map }) => ({
-    completedTasks: () => {
-      console.log('mapSelectors.completedTasks');
-      return map
-        .filter((item) => item.states.completed)
-        .map((item) => item.states);
-    },
-    pendingTasks: () => {
-      console.log('mapSelectors.pendingTasks');
-      return map
-        .filter((item) => !item.states.completed)
-        .map((item) => item.states);
-    },
-    totalTasks: () => {
-      console.log('mapSelectors.totalTasks');
-      return map.filter(() => true).map((item) => item.states).length;
-    }
-  })
+  // mapSelectors: ({ map }) => ({
+  //   completedTasks: () => {
+  //     return map
+  //       .filter((item) => item.states.completed)
+  //       .map((item) => item.states);
+  //   },
+  //   pendingTasks: () => {
+  //     return map
+  //       .filter((item) => !item.states.completed)
+  //       .map((item) => item.states);
+  //   },
+  //   totalTasks: () => {
+  //     return map.filter(() => true).map((item) => item.states).length;
+  //   }
+  // })
+  config: {
+    devtools: true,
+    name: 'ConceptMap'
+  }
 });
 
 // Isolated task checkbox component - only re-renders when completed state changes
 const TaskCheckbox = ({ id }: { id: string }) => {
   const completed = collection.key(id).use.isCompleted();
-  const _completed = collection.key(id).get.isCompleted();
-  console.log('Render: TaskCheckbox', { id, completed, _completed });
 
   return (
     <input
@@ -87,7 +86,6 @@ const TaskCheckbox = ({ id }: { id: string }) => {
 // Isolated text display - only re-renders when text changes
 const TaskText = ({ id }: { id: string }) => {
   const text = collection.key(id).use.text();
-  console.log('Render: TaskText', id);
 
   return <span className="text-lg text-gray-800">{text}</span>;
 };
@@ -129,9 +127,9 @@ const TaskItem = ({ id }: { id: string }) => {
 
 // Stats component - demonstrates map selectors
 const TaskStats = () => {
-  const completed = collection.use.completedTasks();
-  const pending = collection.use.pendingTasks();
-  const total = collection.use.totalTasks();
+  const completed = []; // collection.use.completedTasks();
+  const pending = []; // collection.use.pendingTasks();
+  const total = 0; // collection.use.totalTasks();
   console.log('Render: TaskStats');
 
   return (
@@ -160,7 +158,6 @@ const TaskStats = () => {
 export function MapExample() {
   const currentId = useRef(0);
   const keys = collection.useKeys();
-  console.log('Render: MapExample');
 
   const addTask = () => {
     const id = currentId.current.toString();

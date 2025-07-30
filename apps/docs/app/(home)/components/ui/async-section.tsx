@@ -1,6 +1,6 @@
 'use client';
 
-import { createStore } from '../../../../../../packages/store/src/store';
+import { createStore } from '../../../../../../packages/store/src/store-3';
 import { Button } from './button';
 import { WindowWithCode } from './window';
 
@@ -55,27 +55,36 @@ const fetchUserById = async (id: string): Promise<User> => {
 
 const userStore = createStore<UserStates, UserActions>({
   states: initialUserState,
-  actions: ({ states, notify }) => ({
+  actions: ({ set, notify }) => ({
     async fetchUser(id: string) {
-      states.loading = true;
-      states.error = null;
-      states.user = null;
+      set((states) => {
+        states.loading = true;
+        states.error = null;
+        states.user = null;
+      });
       notify();
 
       try {
-        states.user = await fetchUserById(id);
-        states.loading = false;
-        return states.user;
+        const user = await fetchUserById(id);
+        set((states) => {
+          states.user = user;
+          states.loading = false;
+        });
+        return user;
       } catch (error) {
-        states.error = (error as Error).message;
-        states.loading = false;
+        set((states) => {
+          states.error = (error as Error).message;
+          states.loading = false;
+        });
         throw error;
       }
     },
     clearUser() {
-      states.user = null;
-      states.error = null;
-      states.loading = false;
+      set((states) => {
+        states.user = null;
+        states.error = null;
+        states.loading = false;
+      });
     }
   }),
   config: {

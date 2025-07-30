@@ -1,9 +1,11 @@
 import Link from 'next/link';
 
 import { AsyncSection } from './components/ui/async-section';
+// import { MapExample } from './components/ui/concept-map';
 import { EventSystemSection } from './components/ui/event-system-section';
 import { HeroSection } from './components/ui/hero-section';
-import { StoreTest } from './components/ui/storeTest';
+import { Store2Tests } from './components/ui/store-2-tests';
+// import { StoreTest } from './components/ui/storeTest';
 // import {
 //   AsyncTest,
 //   BasicStoreTest,
@@ -17,7 +19,10 @@ export default function HomePage() {
     <main className="flex min-h-screen flex-col items-center justify-center px-4 py-20">
       <HeroSection />
 
-      <StoreTest />
+      <Store2Tests />
+
+      {/* <StoreTest /> */}
+      {/* <MapExample /> */}
 
       <ThreeWaySection />
       <AsyncSection />

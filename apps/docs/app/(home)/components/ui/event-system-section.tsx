@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { createStore } from '../../../../../../packages/store/src/store';
+import { createStore } from '../../../../../../packages/store/src/store-3';
 import { Button } from './button';
 import { WindowWithCode } from './window';
 
@@ -38,16 +38,20 @@ const cartStore = createStore<
   CartEvents
 >({
   states: initialCartState,
-  actions: ({ states, trigger }) => ({
+  actions: ({ set, trigger }) => ({
     addToCart(item: CartItem) {
-      const foundItem = states.cart.find((i) => i.id === item.id);
-      if (!foundItem) {
-        states.cart = [...states.cart, item];
-        trigger('cart.items.added', item);
-      }
+      set((states) => {
+        const foundItem = states.cart.find((i) => i.id === item.id);
+        if (!foundItem) {
+          states.cart = [...states.cart, item];
+          trigger('cart.items.added', item);
+        }
+      });
     },
     clearCart() {
-      states.cart = [];
+      set((states) => {
+        states.cart = [];
+      });
       trigger('cart.cleared', undefined);
     }
   })

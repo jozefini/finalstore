@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { createStore } from '../../../../../../packages/store/src/store';
+import { createStore } from '../../../../../../packages/store/src/store-3';
 import { PreviewFrame } from './preview';
 
 // Test Store Setup
@@ -43,28 +43,42 @@ type TestSelectors = {
 
 const testStore = createStore<TestStates, TestActions, TestSelectors>({
   states: initialStates,
-  actions: ({ states, notify }) => ({
+  actions: ({ set, notify }) => ({
     increment: () => {
-      states.counter += 1;
+      set((states) => {
+        states.counter += 1;
+      });
     },
     decrement: () => {
-      states.counter -= 1;
+      set((states) => {
+        states.counter -= 1;
+      });
     },
     setName: (name: string) => {
-      states.name = name;
+      set((states) => {
+        states.name = name;
+      });
     },
     addItem: (item: string) => {
-      states.items.push(item);
+      set((states) => {
+        states.items.push(item);
+      });
     },
     removeItem: (index: number) => {
-      states.items.splice(index, 1);
+      set((states) => {
+        states.items.splice(index, 1);
+      });
     },
     updateNestedValue: (value: string) => {
-      states.nested.level1.level2.value = value;
+      set((states) => {
+        states.nested.level1.level2.value = value;
+      });
     },
     simulateAsyncOperation: async () => {
-      states.loading = true;
-      states.asyncResult = null;
+      set((states) => {
+        states.loading = true;
+        states.asyncResult = null;
+      });
       notify();
 
       try {
@@ -72,21 +86,25 @@ const testStore = createStore<TestStates, TestActions, TestSelectors>({
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
         const result = `Async result: ${Math.random().toFixed(4)}`;
-        states.asyncResult = result;
-        states.loading = false;
+        set((states) => {
+          states.asyncResult = result;
+          states.loading = false;
+        });
         return result;
       } catch (error) {
-        states.loading = false;
+        set((states) => {
+          states.loading = false;
+        });
         throw error;
       }
     }
   }),
-  selectors: ({ states }) => ({
-    getCounterId: () => `counter-${states.counter}`,
-    getItemsCount: () => states.items.length,
-    getFormattedName: () => `>>> ${states.name} <<<`,
-    isCounterEven: () => states.counter % 2 === 0,
-    getNestedValue: () => states.nested.level1.level2.value
+  selectors: ({ get }) => ({
+    getCounterId: () => `counter-${get().counter}`,
+    getItemsCount: () => get().items.length,
+    getFormattedName: () => `>>> ${get().name} <<<`,
+    isCounterEven: () => get().counter % 2 === 0,
+    getNestedValue: () => get().nested.level1.level2.value
   }),
   config: {
     name: 'Test Store',

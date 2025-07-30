@@ -1,6 +1,6 @@
 'use client';
 
-import { createStore } from '../../../../../../packages/store/src/store';
+import { createStore } from '../../../../../../packages/store/src/store-3';
 import { Button } from './button';
 import { WindowWithCode } from './window';
 
@@ -33,27 +33,35 @@ const counterStore = createStore<
     count: 0,
     multiplier: 2
   },
-  actions: ({ states }) => ({
+  actions: ({ set }) => ({
     increment() {
-      states.count += 1;
+      set((states) => {
+        states.count += 1;
+      });
     },
     decrement() {
-      states.count -= 1;
+      set((states) => {
+        states.count -= 1;
+      });
     },
     reset() {
-      states.count = 0;
+      set((states) => {
+        states.count = 0;
+      });
     },
     setMultiplier(value: number) {
-      states.multiplier = value;
+      set((states) => {
+        states.multiplier = value;
+      });
     }
   }),
-  selectors: ({ states }) => ({
-    isEven: () => states.count % 2 === 0,
-    isGreaterThan: (value: number) => states.count > value,
-    multipliedValue: () => states.count * states.multiplier,
+  selectors: ({ get }) => ({
+    isEven: () => get().count % 2 === 0,
+    isGreaterThan: (value: number) => get().count > value,
+    multipliedValue: () => get().count * get().multiplier,
     getStatus: () => {
-      if (states.count === 0) return 'Zero';
-      if (states.count > 0) return 'Positive';
+      if (get().count === 0) return 'Zero';
+      if (get().count > 0) return 'Positive';
       return 'Negative';
     }
   })
