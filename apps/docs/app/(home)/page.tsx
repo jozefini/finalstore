@@ -4,7 +4,8 @@ import { AsyncSection } from './components/ui/async-section';
 // import { MapExample } from './components/ui/concept-map';
 import { EventSystemSection } from './components/ui/event-system-section';
 import { HeroSection } from './components/ui/hero-section';
-import { Store2Tests } from './components/ui/store-2-tests';
+import { Map2Tests } from './components/ui/map-2-tests';
+// import { Store2Tests } from './components/ui/store-2-tests';
 // import { StoreTest } from './components/ui/storeTest';
 // import {
 //   AsyncTest,
@@ -19,7 +20,8 @@ export default function HomePage() {
     <main className="flex min-h-screen flex-col items-center justify-center px-4 py-20">
       <HeroSection />
 
-      <Store2Tests />
+      <Map2Tests />
+      {/* <Store2Tests /> */}
 
       {/* <StoreTest /> */}
       {/* <MapExample /> */}
