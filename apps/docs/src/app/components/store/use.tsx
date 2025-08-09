@@ -74,7 +74,7 @@ const PreviewComponent = () => {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => Store.dispatch.increment(1)}
+          onClick={() => Store.dispatch.incrementBy(1)}
         >
           <Plus className="h-4 w-4" />
         </Button>
