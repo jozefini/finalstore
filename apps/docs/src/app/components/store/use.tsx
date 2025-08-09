@@ -11,7 +11,7 @@ import {
 import { Headline } from '@/components/ui/headline';
 import { Section } from '@/components/ui/section';
 import { Store } from '@/lib/store';
-import { Component, Minus, Plus, RefreshCw, Split } from 'lucide-react';
+import { Component, FlaskConical, Minus, Plus, Split } from 'lucide-react';
 
 const code = `// Import the store
 import { Store } from './store';
@@ -100,7 +100,7 @@ export function Use() {
 
       <DetailList>
         <DetailListTitle>
-          <RefreshCw className="h-4 w-4" />
+          <FlaskConical className="h-4 w-4" />
           Reactive updates
         </DetailListTitle>
         <DetailListDescription>

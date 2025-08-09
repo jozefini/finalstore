@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/detail-list';
 import { Headline } from '@/components/ui/headline';
 import { Section } from '@/components/ui/section';
+import { ChartNoAxesGantt, FlaskConicalOff, Split } from 'lucide-react';
 
 const code = `// Import the store
 import { Store } from './store';
@@ -45,24 +46,7 @@ export function Get() {
 
       <DetailList>
         <DetailListTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M10 2v2.343" />
-            <path d="M14 2v6.343" />
-            <path d="m2 2 20 20" />
-            <path d="M20 20a2 2 0 0 1-2 2H6a2 2 0 0 1-1.755-2.96l5.227-9.563" />
-            <path d="M6.453 15H15" />
-            <path d="M8.5 2h7" />
-          </svg>
+          <FlaskConicalOff className="h-4 w-4" />
           Non-reactive
         </DetailListTitle>
         <DetailListDescription>
@@ -71,14 +55,7 @@ export function Get() {
           current data without subscribing to changes.
         </DetailListDescription>
         <DetailListTitle>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" />
-          </svg>
+          <ChartNoAxesGantt className="h-4 w-4" />
           Three access patterns
         </DetailListTitle>
         <DetailListDescription>
@@ -87,26 +64,7 @@ export function Get() {
           without subscriptions.
         </DetailListDescription>
         <DetailListTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m15 15 6 6" />
-            <path d="m15 9 6-6" />
-            <path d="M21 16v5h-5" />
-            <path d="M21 8V3h-5" />
-            <path d="M3 16v5h5" />
-            <path d="m3 21 6-6" />
-            <path d="M3 8V3h5" />
-            <path d="M9 9 3 3" />
-          </svg>
+          <Split className="h-4 w-4" />
           Works everywhere
         </DetailListTitle>
         <DetailListDescription>
