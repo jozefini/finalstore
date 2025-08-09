@@ -1,2 +1,2 @@
-export { createScopedStore, createStore, isDeepEqual } from './store';
+export { createStore } from './store';
 export { createMap, createScopedMap } from './map';

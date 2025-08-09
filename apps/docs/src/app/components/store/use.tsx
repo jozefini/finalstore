@@ -1,4 +1,7 @@
+'use client';
+
 import { Preview } from '@/components/preview';
+import { Button } from '@/components/ui/button';
 import { Description } from '@/components/ui/description';
 import {
   DetailList,
@@ -8,6 +11,7 @@ import {
 import { Headline } from '@/components/ui/headline';
 import { Section } from '@/components/ui/section';
 import { Store } from '@/lib/store';
+import { Component, Minus, Plus, RefreshCw, Split } from 'lucide-react';
 
 const code = `// Import the store
 import { Store } from './store';
@@ -38,23 +42,43 @@ function Counter() {
 }`;
 
 const PreviewComponent = () => {
-  // Method 1: Subscribe to entire state (⚠️ causes re-renders on ANY state change)
-  const state = Store.use();
-  // Method 2: Subscribe to specific state (✅ re-renders only when count changes)
   const count = Store.use((state) => state.count);
-  // Method 3: Subscribe to computed selector (✅ re-renders only when isEven changes)
   const isEven = Store.use.isEven();
 
-  // ❌ Error: Can't use outside component body
-  function handleClick() {
-    // Use Store.get() here instead
-    const currentCount = Store.get((s) => s.count);
-  }
   return (
-    <div>
-      <p>Count: {count}</p>
-      <p>Is Even: {isEven ? 'Yes' : 'No'}</p>
-      <button onClick={() => Store.dispatch.increment(1)}>+1</button>
+    <div className="flex flex-col items-center gap-8 py-4">
+      <div className="bg-muted/30 grid grid-cols-2 gap-x-12 gap-y-4 rounded-lg border p-6">
+        <div className="text-muted-foreground text-right font-medium">
+          Count
+        </div>
+        <div className="font-bold tabular-nums tracking-tight">{count}</div>
+
+        <div className="text-muted-foreground text-right font-medium">
+          Is Even
+        </div>
+        <div className="flex items-center gap-2 font-bold">
+          <span className={isEven ? 'text-emerald-500' : 'text-red-500'}>
+            {isEven ? 'Yes' : 'No'}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => Store.dispatch.decrement(1)}
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => Store.dispatch.increment(1)}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 };
@@ -76,20 +100,7 @@ export function Use() {
 
       <DetailList>
         <DetailListTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-            <path d="M21 3v5h-5" />
-          </svg>
+          <RefreshCw className="h-4 w-4" />
           Reactive updates
         </DetailListTitle>
         <DetailListDescription>
@@ -98,17 +109,7 @@ export function Use() {
           need.
         </DetailListDescription>
         <DetailListTitle>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M13 3v6h6" />
-            <path d="M21 3h-8l-2 2-2-2H3v7l2 2-2 2v7h8l2-2 2 2h8v-7l-2-2 2-2V3z" />
-          </svg>
+          <Component className="h-4 w-4" />
           Component-only
         </DetailListTitle>
         <DetailListDescription>
@@ -117,22 +118,7 @@ export function Use() {
           instead.
         </DetailListDescription>
         <DetailListTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m13 8-8 6-2-2 8-6 2 2Z" />
-            <path d="m13 12-8 6-2-2 8-6 2 2Z" />
-            <path d="M21 8V6l-8 6 8 6v-2" />
-            <path d="M21 12v-2l-8 6 8 6v-2" />
-          </svg>
+          <Split className="h-4 w-4" />
           Optimized subscriptions
         </DetailListTitle>
         <DetailListDescription>

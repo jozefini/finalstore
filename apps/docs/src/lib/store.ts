@@ -1,4 +1,6 @@
-import { createStore } from '../../../../packages/store/src/store-3'; // Your store implementation
+'use client';
+
+import { createStore } from './package/store'; // Your store implementation
 
 // Types
 type States = {
