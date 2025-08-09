@@ -114,7 +114,8 @@ export function Use() {
         </DetailListTitle>
         <DetailListDescription>
           Must be called directly in your React component body, following hooks
-          rules. For non-component code like event handlers, use Store.get()
+          rules. For non-component code like event handlers, use
+          <code>Store.get()</code>
           instead.
         </DetailListDescription>
         <DetailListTitle>
