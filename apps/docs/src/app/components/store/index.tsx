@@ -1,3 +1,4 @@
+import { Dispatch } from './dispatch';
 import { Get } from './get';
 import { Setup } from './setup';
 import { Use } from './use';
@@ -8,6 +9,7 @@ export function StoreDocs() {
       <Setup />
       <Get />
       <Use />
+      <Dispatch />
     </>
   );
 }
