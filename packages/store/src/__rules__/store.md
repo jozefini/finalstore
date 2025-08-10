@@ -1,708 +1,362 @@
-# Store Documentation
+# Store Logic Documentation
 
-React state management with direct mutations, TypeScript-first design, and zero boilerplate.
+This document describes the core components and architecture of your custom reactive state management system. It's designed to provide **"ultra thinking"** capabilities, focusing on fine-grained reactivity, performance optimizations, and developer experience enhancements.
 
-## Core Pattern
+---
 
-Always use explicit types. Define initial state as typed constants.
+## 1. Overview and Core Principles
 
-```tsx
-// ✅ Required Pattern
-const initialStates = {
-  count: 0 as number,
-  name: '' as string,
-  items: [] as Item[]
+This library provides a robust framework for managing application state with a focus on reactivity, performance, and debuggability.
+
+**Key principles include:**
+
+- **Signals for Fine-Grained Reactivity**
+  Changes in individual data points (signals) trigger updates only where necessary, avoiding unnecessary re-renders.
+
+- **Structural Sharing for Immutability & Efficiency**
+  State updates create new versions of the modified parts while reusing unchanged parts, optimizing memory and change detection.
+
+- **Selective Caching with LRU**
+  Heavily used computed values (selectors) are cached, and an LRU (Least Recently Used) policy manages cache size.
+
+- **Priority Scheduling**
+  Updates and side effects are processed efficiently using a priority-based task scheduler, ensuring critical operations run first.
+
+- **DevTools Integration**
+  Seamless integration with Redux DevTools for time-travel debugging and state inspection.
+
+- **Event System**
+  A flexible event system for decoupled communication between different parts of your application.
+
+---
+
+## 2. Core Components
+
+### 2.1. AnyType
+
+**Type:** `any`
+
+**Description:**
+A utility type used to represent any possible JavaScript type, often employed for flexibility in generic functions or when type inference is difficult.
+In production, minimize its use to maintain stronger type safety.
+
+---
+
+### 2.2. CacheWrapper\<T\>
+
+**Type:** Interface
+
+**Description:**
+A wrapper type used to mark functions as cacheable.
+
+- `__isCached: true` — Indicates that the function is intended for caching.
+- `fn: (...args: AnyType[]) => T` — The actual function that will be cached.
+- `dependencies?: Set<string>` — Optional set of dependency identifiers (e.g., signal paths) used internally for invalidation.
+
+---
+
+### 2.3. Signal\<T\>
+
+**Type:** Class
+
+**Description:**
+The fundamental building block for reactivity. A Signal holds a value and automatically tracks dependencies when accessed, and notifies subscribers on change.
+
+**Key members:**
+
+- `constructor(value: T)` — Initializes with an initial value.
+- `value` (getter/setter) — Tracks dependencies when read, notifies subscribers when changed.
+- `getValue(): T` — Explicit getter.
+- `version: number` — Increments on each change.
+- `subscribe(callback: () => void): () => void` — Registers change listener.
+- `private notify()` — Calls all subscribers.
+
+---
+
+### 2.4. TrackingContextManager
+
+**Type:** Class
+
+**Description:**
+Manages context for dependency tracking.
+
+**Key members:**
+
+- `context` — Current tracking context containing dependencies.
+- `getCurrent()` / `setCurrent(value)` — Accessor methods.
+- `trackingContextManager` — Exported instance.
+- Helper functions: `getCurrentTrackingContext()` / `setCurrentTrackingContext()`.
+
+---
+
+### 2.5. withDependencyTracking\<T\>
+
+**Type:** Function
+
+Executes a given function within a dependency tracking context.
+Returns `{ result, dependencies }`.
+
+---
+
+### 2.6. StructuralNode
+
+**Type:** Class
+
+**Description:**
+Implements structural sharing for immutable updates.
+
+**Key members:**
+
+- `constructor(data, path)` — Builds node structure.
+- `get(path)` — Retrieves by dot-path.
+- `getData()` — Snapshot of entire node tree.
+- `set(path, value)` — Returns new node with updated path.
+- `getVersion()` — Version number for change detection.
+- `getAllSignals(prefix)` — Recursively collects signals.
+
+---
+
+### 2.7. LRUCache\<K, V\>
+
+**Type:** Class
+
+**Description:**
+LRU cache implementation for selector results.
+
+**Key members:**
+`get`, `set`, `delete`, `clear`, `has`, `size`.
+
+---
+
+### 2.8. SelectorCacheEntry
+
+**Type:** Object structure
+
+**Fields:**
+
+- `result` — Selector result.
+- `dependencies?` — Signals used.
+- `lastUsed` — Timestamp for LRU policy.
+- `computeCount` — Recompute counter.
+- `isValid` — Cache validity flag.
+
+---
+
+### 2.9. PriorityScheduler
+
+**Type:** Class
+
+Manages tasks by **priority** (`high`, `normal`, `low`) and supports batching.
+
+**Key members:**
+`enterBatch()`, `exitBatch()`, `scheduleHigh()`, `scheduleNormal()`, `scheduleLow()`, `flush()`.
+
+---
+
+### 2.10. cache\<T\>
+
+Marks a selector as cacheable.
+
+---
+
+### 2.11. isCacheWrapper
+
+Type guard for `CacheWrapper`.
+
+---
+
+### 2.12. createDevToolsIntegration
+
+Integrates with Redux DevTools.
+
+**Config:**
+
+- `name`
+- `onJump`
+- `onReset`
+- `getState`
+
+Returns DevTools control object.
+
+---
+
+### 2.13. Event System
+
+**Functions:**
+
+- `trigger(eventName, payload)`
+- `on(eventName, callback)` — Returns `{ off }`
+- `clear()` — Removes all listeners.
+
+---
+
+## 3. createStore — The Main Entry Point
+
+### 3.1. StoreProps
+
+Defines the configuration object for `createStore`.
+
+**Props:**
+
+- `states`
+- `actions?`
+- `selectors?`
+- `config?` — `name`, `devtools`, `cacheSize`, `enablePredictiveComputation`
+
+---
+
+### 3.2. StoreActionFunction
+
+Signature of an action function.
+
+---
+
+### 3.3. StoreSelectorFunction
+
+Signature of a selector function.
+
+---
+
+### 3.4. InferStore
+
+Represents the complete public API returned by `createStore`.
+
+**Members:**
+
+- `dispatch`
+- `use`
+- `get`
+- `reset()`
+- `batch(callback)`
+- `on(eventName, callback)`
+
+---
+
+### 3.5. Internal Mechanisms
+
+- **State Management** via `StructuralNode`
+- **Caching** — `globalSelectorCache` & `persistentSelectorCache`
+- **Dependency Tracking** — `selectorDependencies`, `signalToSelectors`
+- **Selector Execution**
+- **Subscription System**
+- **Actions Handling** with `setState`, `clearCache`, `invalidate`
+
+---
+
+## 4. Usage Example
+
+```ts
+// Define state, actions, and selectors
+type MyState = {
+  user: { id: string; name: string; email: string };
+  cart: {
+    items: Array<{ productId: string; quantity: number }>;
+    totalItems: number;
+  };
+  loading: boolean;
+  loadingMessage: string;
+  fetchedData: any | null;
 };
 
-type States = typeof initialStates;
-type Actions = {
-  increment: () => void;
-  setName: (name: string) => void;
+type MyActions = {
+  updateUserName: (newName: string) => void;
+  addItemToCart: (productId: string, quantity: number) => void;
+  fetchComplexData: () => Promise<void>;
 };
 
-const store = createStore<States, Actions>({
-  states: initialStates,
-  actions: ({ states }) => ({
-    increment: () => {
-      states.count += 1;
+type MySelectors = {
+  userName: () => string;
+  cartItemCount: () => number;
+  isCartEmpty: () => boolean;
+  totalCartValue: (priceMap: Record<string, number>) => number;
+  isLoadingData: () => boolean;
+  currentLoadingMessage: () => string;
+};
+
+const myStore = createStore<MyState, MyActions, MySelectors>({
+  states: {
+    user: { id: '123', name: 'Alice', email: 'alice@example.com' },
+    cart: { items: [], totalItems: 0 },
+    loading: false,
+    loadingMessage: '',
+    fetchedData: null
+  },
+  actions: ({ set, get, notify }) => ({
+    updateUserName: (newName) => {
+      set((state) => {
+        state.user.name = newName;
+      });
     },
-    setName: (name: string) => {
-      states.name = name;
-    }
-  })
-});
-```
-
-## States
-
-State is the single source of truth. Always define with explicit types.
-
-```tsx
-// ✅ Correct - explicit types
-const initialStates = {
-  user: null as User | null,
-  loading: false as boolean,
-  items: [] as Item[]
-};
-
-// ❌ Avoid - inferred types
-const initialStates = {
-  user: null,  // TypeScript can't infer User type
-  loading: false,
-  items: []
-};
-```
-
-**Rules:**
-
-- Use `as Type` for explicit typing
-- Store uses `deepClone` internally - safe to reference `initialStates` in actions
-- Primitive values, objects, arrays, Maps, Sets all supported
-
-## Actions
-
-Direct state mutations. Support sync and async operations.
-
-```tsx
-type Actions = {
-  // Sync action
-  increment: () => void;
-
-  // Async action
-  fetchUser: (id: string) => Promise<User>;
-
-  // Action with parameters
-  updateItem: (id: string, data: Partial<Item>) => void;
-};
-
-const store = createStore<States, Actions>({
-  states: initialStates,
-  actions: ({ states, notify, trigger }) => ({
-    increment: () => {
-      states.count += 1;
+    addItemToCart: (productId, quantity) => {
+      set((state) => {
+        const existingItem = state.cart.items.find(
+          (item) => item.productId === productId
+        );
+        if (existingItem) existingItem.quantity += quantity;
+        else state.cart.items.push({ productId, quantity });
+        state.cart.totalItems = state.cart.items.reduce(
+          (sum, item) => sum + item.quantity,
+          0
+        );
+      });
     },
+    fetchComplexData: async () => {
+      set((state) => {
+        state.loading = true;
+        state.loadingMessage = 'Starting data fetch...';
+        state.fetchedData = null;
+      });
 
-    async fetchUser(id: string) {
-      states.loading = true;
-      notify(); // Immediate UI update for loading state
+      await new Promise((r) => setTimeout(r, 1000));
+      get().loadingMessage = 'Fetching user details...';
+      notify();
 
-      states.user = await getUserById(id);
-      states.loading = false;
+      await new Promise((r) => setTimeout(r, 1500));
+      get().loadingMessage = 'Processing historical orders...';
+      notify();
 
-      return states.user;
-    },
-
-    updateItem: (id: string, data: Partial<Item>) => {
-      // ✅ Reliable: Replace entire array with updated item
-      states.items = states.items.map((item) =>
-        item.id === id ? { ...item, ...data } : item
-      );
+      await new Promise((r) => setTimeout(r, 2000));
+      set((state) => {
+        state.fetchedData = {
+          user: { id: 'test-user', name: 'John Doe', age: 30 },
+          orders: [
+            { id: 'order-1', amount: 120 },
+            { id: 'order-2', amount: 35 }
+          ]
+        };
+        state.loading = false;
+        state.loadingMessage = 'Data loaded successfully!';
+      });
     }
-  })
-});
-```
-
-**Rules:**
-
-- Mutate `states` directly - no returns needed
-- Async actions return promises
-- Call `notify()` for immediate UI updates in async actions
-- Use `trigger()` for events
-- Actions auto-notify subscribers when complete
-
-## Selectors
-
-Computed values with automatic memoization.
-
-```tsx
-type Selectors = {
-  completedTodos: () => Todo[];
-  getTodoById: (id: string) => Todo | undefined;
-  stats: () => { total: number; completed: number };
-};
-
-const store = createStore<States, {}, Selectors>({
-  states: initialStates,
-  selectors: ({ states }) => ({
-    completedTodos: () => states.todos.filter((t) => t.completed),
-
-    getTodoById: (id: string) => states.todos.find((t) => t.id === id),
-
-    stats: () => ({
-      total: states.todos.length,
-      completed: states.todos.filter((t) => t.completed).length
-    })
-  })
-});
-```
-
-**Usage:**
-
-```tsx
-// In components
-const completed = store.use.completedTodos();
-const todo = store.use.getTodoById('123');
-
-// Non-reactive access
-const stats = store.get.stats();
-```
-
-## Events
-
-Side effects and pub/sub system.
-
-```tsx
-type Events = {
-  userLoggedIn: User;
-  error: Error;
-  dataChanged: { type: string; data: any };
-};
-
-const store = createStore<States, Actions, {}, Events>({
-  states: initialStates,
-  actions: ({ states, trigger }) => ({
-    login: async (credentials) => {
-      const user = await authenticate(credentials);
-      states.user = user;
-      trigger('userLoggedIn', user);
-    }
-  })
-});
-
-// Listen to events
-const userLoginListener = store.on('userLoggedIn', (user) => {
-  track('User Login', { userId: user.id });
-});
-
-// Remove listener
-userLoginListener.off();
-```
-
-## Reactive Access - `use()`
-
-Subscribe to state changes in React components.
-
-```tsx
-function Component() {
-  // Get entire state
-  const state = store.use();
-
-  // Get specific value
-  const count = store.use(state => state.count);
-
-  // Get multiple values
-  const { count, name } = store.use(state => ({
-    count: state.count,
-    name: state.name
-  }));
-
-  // Use selectors
-  const completed = store.use.completedTodos();
-}
-```
-
-**Rules:**
-
-- Only use in React components
-- Automatically subscribes and unsubscribes
-- Triggers re-renders when selected state changes
-- Selectors are memoized automatically
-
-## Non-Reactive Access - `get()`
-
-Get current state without subscribing.
-
-```tsx
-// Get entire state
-const state = store.get();
-
-// Get specific value
-const count = store.get((state) => state.count);
-
-// Use selectors
-const stats = store.get.stats();
-
-// In event handlers, utils, etc.
-button.onclick = () => {
-  const currentCount = store.get((state) => state.count);
-  console.log(currentCount);
-};
-```
-
-## Dispatching Actions
-
-Call actions through the dispatch object.
-
-```tsx
-// Sync actions
-store.dispatch.increment();
-store.dispatch.setName('John');
-
-// Async actions
-const user = await store.dispatch.fetchUser('123');
-
-// In components
-function Counter() {
-  const count = store.use((state) => state.count);
-  const { increment, decrement } = store.dispatch;
-
-  return (
-    <div>
-      <span>{count}</span>
-      <button onClick={increment}>+</button>
-      <button onClick={decrement}>-</button>
-    </div>
-  );
-}
-```
-
-## Batching
-
-Group multiple updates into single re-render.
-
-```tsx
-// Multiple updates = multiple re-renders
-store.dispatch.increment();
-store.dispatch.setName('John');
-store.dispatch.addItem(item);
-
-// Batched = single re-render
-store.batch(() => {
-  store.dispatch.increment();
-  store.dispatch.setName('John');
-  store.dispatch.addItem(item);
-});
-```
-
-**Rules:**
-
-- Use for multiple synchronous updates
-- Async actions in batch still trigger individual notifications
-- DevTools shows batched actions as group
-
-## Reset
-
-Restore to initial state.
-
-```tsx
-// Reset entire store
-store.reset();
-
-// Custom reset in actions
-actions: ({ states }) => ({
-  resetForm: () => {
-    // Safe to use initialStates - store uses deepClone
-    states.formData = initialStates.formData;
-    states.errors = initialStates.errors;
-  }
-});
-```
-
-## DevTools Integration
-
-Redux DevTools support for debugging.
-
-```tsx
-const store = createStore({
-  states: initialStates,
-  actions: actions,
+  }),
+  selectors: ({ get, cache }) => ({
+    userName: () => get().user.name,
+    cartItemCount: () => get().cart.totalItems,
+    isCartEmpty: cache(() => get().cart.totalItems === 0),
+    totalCartValue: cache((priceMap) =>
+      get().cart.items.reduce((total, item) => {
+        const price = priceMap[item.productId] || 0;
+        return total + price * item.quantity;
+      }, 0)
+    ),
+    isLoadingData: () => get().loading,
+    currentLoadingMessage: () => get().loadingMessage
+  }),
   config: {
-    name: 'My Store',
-    devtools: true // Enable in development
+    name: 'MyECommerceStore',
+    devtools: true,
+    cacheSize: 500
   }
 });
 ```
 
-**Features:**
+---
 
-- Time travel debugging
-- Action replay
-- State inspection
-- Jump to action/state
+## 5. Next Steps
 
-## Scoped Stores
+- **Error Handling** — Improve resilience in selectors/actions.
+- **Testing** — Add unit & integration tests.
+- **Middleware** — Support logging, analytics, async side effects.
+- **Extensibility** — Plan clean integration points for new features.
 
-Context-based stores for component scope.
-
-```tsx
-const { Provider, useStore } = createScopedStore({
-  states: { formData: { name: '', email: '' } },
-  actions: ({ states }) => ({
-    updateField: (field: string, value: string) => {
-      states.formData[field] = value;
-    }
-  })
-});
-
-function App() {
-  return (
-    <Provider>
-      <Form />
-    </Provider>
-  );
-}
-
-function Form() {
-  const store = useStore();
-  const formData = store.use((state) => state.formData);
-
-  return (
-    <input
-      value={formData.name}
-      onChange={(e) => store.dispatch.updateField('name', e.target.value)}
-    />
-  );
-}
-```
-
-## TypeScript Patterns
-
-### Explicit Type Declaration
-
-**Always declare types explicitly:**
-
-```tsx
-// ✅ Required
-const store = createStore<States, Actions, Selectors, Events>({
-  // implementation
-});
-
-// ❌ Don't rely on inference
-const store = createStore({
-  // TypeScript can't infer complex types
-});
-```
-
-### Initial State Pattern
-
-```tsx
-// ✅ Best practice
-const initialStates = {
-  count: 0 as number,
-  user: null as User | null,
-  items: [] as Item[]
-};
-
-type States = typeof initialStates;
-
-// ✅ Alternative
-interface States {
-  count: number;
-  user: User | null;
-  items: Item[];
-}
-
-const initialStates: States = {
-  count: 0,
-  user: null,
-  items: []
-};
-```
-
-### Action Types
-
-```tsx
-type Actions = {
-  syncAction: () => void;
-  asyncAction: (param: string) => Promise<Result>;
-  voidAction: (data: Data) => void;
-};
-```
-
-### Selector Types
-
-```tsx
-type Selectors = {
-  computed: () => ComputedValue;
-  filtered: (criteria: FilterCriteria) => Item[];
-  single: (id: string) => Item | undefined;
-};
-```
-
-## Performance Rules
-
-### Selector Optimization
-
-```tsx
-// ✅ Specific selectors
-const count = store.use(state => state.count);
-
-// ❌ Over-selecting
-const state = store.use();
-const count = state.count; // Triggers on any state change
-```
-
-### Batching Guidelines
-
-```tsx
-// ✅ Batch synchronous updates
-store.batch(() => {
-  store.dispatch.updateA();
-  store.dispatch.updateB();
-  store.dispatch.updateC();
-});
-
-// ✅ Don't batch async actions - they handle their own updates
-await store.dispatch.fetchData();
-await store.dispatch.processData();
-```
-
-### Memoization
-
-Selectors are automatically memoized. Complex selectors benefit from React.useMemo:
-
-```tsx
-const expensiveSelector = useMemo(
-  () => (state: State) => expensiveComputation(state.data),
-  []
-);
-
-const result = store.use(expensiveSelector);
-```
-
-## Common Patterns
-
-### Loading States
-
-```tsx
-const initialStates = {
-  data: null as Data | null,
-  loading: false as boolean,
-  error: null as Error | null
-};
-
-const actions = ({ states, notify }) => ({
-  async fetchData() {
-    states.loading = true;
-    states.error = null;
-    notify(); // Show loading immediately
-
-    try {
-      states.data = await api.getData();
-    } catch (error) {
-      states.error = error as Error;
-    } finally {
-      states.loading = false;
-    }
-  }
-});
-```
-
-### Form Management
-
-```tsx
-const initialStates = {
-  values: {} as Record<string, any>,
-  errors: {} as Record<string, string>,
-  touched: {} as Record<string, boolean>
-};
-
-const actions = ({ states }) => ({
-  setValue: (field: string, value: any) => {
-    states.values[field] = value;
-    states.touched[field] = true;
-    delete states.errors[field];
-  },
-
-  setError: (field: string, error: string) => {
-    states.errors[field] = error;
-  }
-});
-```
-
-### List Management
-
-```tsx
-const actions = ({ states }) => ({
-  addItem: (item: Item) => {
-    // ✅ Reliable: Replace entire array
-    states.items = [...states.items, item];
-  },
-
-  updateItem: (id: string, updates: Partial<Item>) => {
-    // ✅ Reliable: Replace entire array with updated item
-    states.items = states.items.map((item) =>
-      item.id === id ? { ...item, ...updates } : item
-    );
-  },
-
-  removeItem: (id: string) => {
-    // ✅ Already correct: Replace entire array
-    states.items = states.items.filter((i) => i.id !== id);
-  }
-});
-```
-
-## Migration Patterns
-
-### From Redux
-
-```tsx
-// Redux reducer
-const reducer = (state, action) => {
-  switch (action.type) {
-    case 'INCREMENT':
-      return { ...state, count: state.count + 1 };
-  }
-};
-
-// Store equivalent
-const actions = ({ states }) => ({
-  increment: () => {
-    states.count += 1;
-  }
-});
-```
-
-### From Zustand
-
-```tsx
-// Zustand
-const useStore = create((set) => ({
-  count: 0,
-  increment: () => set((state) => ({ count: state.count + 1 }))
-}));
-
-// Store equivalent
-const store = createStore<States, Actions>({
-  states: { count: 0 as number },
-  actions: ({ states }) => ({
-    increment: () => {
-      states.count += 1;
-    }
-  })
-});
-```
-
-## Error Handling
-
-### Action Error Handling
-
-```tsx
-const actions = ({ states, trigger }) => ({
-  async fetchData() {
-    try {
-      states.data = await api.getData();
-    } catch (error) {
-      states.error = error as Error;
-      trigger('error', error as Error);
-      throw error; // Re-throw for component handling
-    }
-  }
-});
-
-// In component
-const handleFetch = async () => {
-  try {
-    await store.dispatch.fetchData();
-  } catch (error) {
-    // Handle UI-specific error response
-  }
-};
-```
-
-### Global Error Events
-
-```tsx
-// Listen to all errors
-const errorListener = store.on('error', (error) => {
-  console.error('Store error:', error);
-  // Send to error reporting service
-});
-
-// Cleanup when no longer needed
-errorListener.off();
-```
-
-## Mutation Detection
-
-The store works **exactly like Immer** - you can mutate state directly at any depth and it detects changes automatically using a sophisticated deep proxy system.
-
-### ✅ All Mutations Work (Detected Automatically)
-
-```tsx
-actions: ({ states }) => ({
-  // Direct property assignments
-  updateName: (name) => {
-    states.user.name = name; // ✅ Works
-  },
-
-  // Object property mutations
-  updateSettings: (key, value) => {
-    states.settings[key] = value; // ✅ Works
-  },
-
-  // Array mutations
-  addItem: (item) => {
-    states.items.push(item); // ✅ Works
-  },
-
-  // Delete properties
-  removeError: (field) => {
-    delete states.errors[field]; // ✅ Works
-  },
-
-  // Deep nested mutations (now fully supported!)
-  updateUserTheme: (userId, theme) => {
-    const user = states.users.find((u) => u.id === userId);
-    user.profile.settings.theme = theme; // ✅ Works perfectly!
-  },
-
-  // Complex nested operations
-  updateCell: (row, col, value) => {
-    states.grid[row][col] = value; // ✅ Works
-  },
-
-  // Mixed operations
-  complexUpdate: () => {
-    states.count += 1;
-    states.items.push(`item-${states.count}`);
-    states.user.profile.lastActive = new Date();
-    delete states.errors.validation; // ✅ All work together
-  }
-});
-```
-
-### 🚀 Deep Proxy System
-
-The store uses an advanced **deep proxy system** with:
-
-- **Lazy wrapping** - Objects are only proxied when accessed
-- **WeakMap caching** - Prevents duplicate proxies and memory leaks
-- **Smart type detection** - Preserves Maps, Sets, Dates, and built-in objects
-- **Method preservation** - Functions work normally without interference
-- **Performance optimized** - Only tracks actual mutations
-
-### 💡 No Limitations
-
-Unlike other state managers, there are **no mutation detection limitations**:
-
-- ✅ Mutate at any depth
-- ✅ Use any JavaScript patterns
-- ✅ Works with all data types
-- ✅ No special syntax required
-- ✅ Perfect TypeScript support
-- ✅ **Perfect async reactivity** - React components update instantly for all async mutations
-
-### 🔧 Technical Implementation
-
-The store uses advanced techniques to ensure perfect React integration:
-
-- **Deep proxy system** detects all mutations automatically
-- **State version tracking** ensures React detects changes via `stateVersion` instead of reference equality
-- **Object spreading** creates new references `{ ...state }` so React's `useSyncExternalStore` properly detects changes
-- **Microtask batching** optimizes performance while maintaining instant reactivity
-
-## Best Practices
-
-1. **Always use explicit types** - `createStore<States, Actions, Selectors, Events>()`
-2. **Define initial state with types** - `count: 0 as number`
-3. **Use immutable patterns** - Replace objects/arrays instead of mutating
-4. **Use initial state in reset** - Safe due to `deepClone`
-5. **Batch multiple updates** - Single re-render
-6. **Use selectors for computed values** - Automatic memoization
-7. **Handle async with notify()** - Immediate loading states
-8. **Use events for side effects** - Keep actions pure
-9. **Enable devtools in development**
-10. **Optimize selectors** - Select only what you need
-11. **Test stores easily** - Just functions and objects
+---
