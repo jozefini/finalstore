@@ -9,27 +9,32 @@ import { Headline } from '@/components/ui/headline';
 import { Section } from '@/components/ui/section';
 import { ChartNoAxesGantt, FlaskConicalOff, Split } from 'lucide-react';
 
-const code = `// Import the store
-import { Store } from './store';
+const code = `import { Cart } from './store';
 
-// Method 1: Get entire state
-const entireState = Store.get();
-console.log(entireState.count); // 0
+// Method 1: Get the entire state object
+const entireState = Cart.get();
+console.log(entireState.items);   // []
+console.log(entireState.loading); // false
 
-// Method 2: Get specific state with selector function
-const count = Store.get((state) => state.count);
-console.log(count); // 0
+// Method 2: Get a specific piece of state via selector function
+const loading = Cart.get((state) => state.loading);
+console.log(loading); // false
 
-// Method 3: Get computed value using selectors
-const isEven = Store.get.isEven();
-console.log(isEven); // true (since count is 0)
+// Method 3: Get a computed value from cached selectors
+const totalItems = Cart.get.totalItems();
+console.log(totalItems); // 0
 
-// Can be called anywhere - no React required!
-function isCountGreaterThanTen() {
-  const currentCount = Store.get((s) => s.count);
-  return currentCount > 10;
+// Method 4: Get another computed value (also cached)
+const totalPrice = Cart.get.totalPrice();
+console.log(totalPrice); // 0
+
+// Example: This can be called anywhere - no React required!
+function hasMoreThanFiveItems() {
+  const itemCount = Cart.get.totalItems(); // Cached selector
+  return itemCount > 5;
 }
-`;
+
+console.log(hasMoreThanFiveItems()); // false`;
 
 export function Get() {
   return (
@@ -42,20 +47,20 @@ export function Get() {
         components.
       </Description>
 
-      <Preview code={code} />
+      <Preview code={code} autoHeight />
 
       <DetailList>
         <DetailListTitle>
-          <FlaskConicalOff className="h-4 w-4" />
+          <FlaskConicalOff />
           Non-reactive
         </DetailListTitle>
         <DetailListDescription>
-          Get methods don't trigger re-renders. They're perfect for one-time
-          reads, utility functions, event handlers, and anywhere you need
-          current data without subscribing to changes.
+          Get methods don&apos;t trigger re-renders. They&apos;re perfect for
+          one-time reads, utility functions, event handlers, and anywhere you
+          need current data without subscribing to changes.
         </DetailListDescription>
         <DetailListTitle>
-          <ChartNoAxesGantt className="h-4 w-4" />
+          <ChartNoAxesGantt />
           Three access patterns
         </DetailListTitle>
         <DetailListDescription>
@@ -64,7 +69,7 @@ export function Get() {
           without subscriptions.
         </DetailListDescription>
         <DetailListTitle>
-          <Split className="h-4 w-4" />
+          <Split />
           Works everywhere
         </DetailListTitle>
         <DetailListDescription>

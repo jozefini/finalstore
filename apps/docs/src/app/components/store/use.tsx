@@ -1,7 +1,6 @@
 'use client';
 
 import { Preview } from '@/components/preview';
-import { Button } from '@/components/ui/button';
 import { Description } from '@/components/ui/description';
 import {
   DetailList,
@@ -10,78 +9,49 @@ import {
 } from '@/components/ui/detail-list';
 import { Headline } from '@/components/ui/headline';
 import { Section } from '@/components/ui/section';
-import { Store } from '@/lib/store';
-import { Component, FlaskConical, Minus, Plus, Split } from 'lucide-react';
+import { Component, FlaskConical, Split } from 'lucide-react';
 
-const code = `// Import the store
-import { Store } from './store';
+const code = `import { Cart } from './store';
 
-function Counter() {
-  // Method 1: Subscribe to entire state (⚠️ causes re-renders on ANY state change)
-  const state = Store.use();
+function CartSummary() {
+  // Method 1: Subscribe to the entire state
+  // ⚠️ Will cause re-render on ANY state change (items, loading, etc.)
+  const state = Cart.use();
 
-  // Method 2: Subscribe to specific state (✅ re-renders only when count changes)
-  const count = Store.use((state) => state.count);
+  // Method 2: Subscribe to specific state slice
+  // ✅ Only re-renders when "loading" changes
+  const loading = Cart.use((state) => state.loading);
 
-  // Method 3: Subscribe to computed selector (✅ re-renders only when isEven changes)
-  const isEven = Store.use.isEven();
+  // Method 3: Subscribe to a computed selector
+  // ✅ Only re-renders when totalItems changes (cached selector)
+  const totalItems = Cart.use.totalItems();
 
-  // ❌ Error: Can't use outside component body
-  function handleClick() {
-    // Use Store.get() here instead
-    const currentCount = Store.get((s) => s.count);
+  // Method 4: Subscribe to another computed selector
+  // ✅ Only re-renders when totalPrice changes (cached selector)
+  const totalPrice = Cart.use.totalPrice();
+
+  // ❌ Error: Can't use Cart.use() outside component body
+  // Use Cart.get() instead for event handlers or non-render logic
+  function handleCheckout() {
+    const items = Cart.get((s) => s.items); // Safe here
+    console.log('Checking out with:', items);
   }
 
   return (
     <div>
-      <p>Count: {count}</p>
-      <p>Is Even: {isEven ? 'Yes' : 'No'}</p>
-      <button onClick={() => Store.dispatch.increment(1)}>+1</button>
+      <h2>Cart Summary</h2>
+      {loading ? (
+        <p>Loading your cart...</p>
+      ) : (
+        <>
+          <p>Total Items: {totalItems}</p>
+          <p>Total Price: \${totalPrice.toFixed(2)}</p>
+        </>
+      )}
+      <button onClick={handleCheckout}>Checkout</button>
     </div>
   );
 }`;
-
-const PreviewComponent = () => {
-  const count = Store.use((state) => state.count);
-  const isEven = Store.use.isEven();
-
-  return (
-    <div className="flex flex-col items-center gap-8 py-4">
-      <div className="bg-muted/30 grid grid-cols-2 gap-x-12 gap-y-4 rounded-lg border p-6">
-        <div className="text-muted-foreground text-right font-medium">
-          Count
-        </div>
-        <div className="font-bold tabular-nums tracking-tight">{count}</div>
-
-        <div className="text-muted-foreground text-right font-medium">
-          Is Even
-        </div>
-        <div className="flex items-center gap-2 font-bold">
-          <span className={isEven ? 'text-emerald-500' : 'text-red-500'}>
-            {isEven ? 'Yes' : 'No'}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => Store.dispatch.decrement(1)}
-        >
-          <Minus className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => Store.dispatch.incrementBy(1)}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-};
 
 export function Use() {
   return (
@@ -94,13 +64,11 @@ export function Use() {
         store.
       </Description>
 
-      <Preview code={code}>
-        <PreviewComponent />
-      </Preview>
+      <Preview code={code} autoHeight />
 
       <DetailList>
         <DetailListTitle>
-          <FlaskConical className="h-4 w-4" />
+          <FlaskConical />
           Reactive updates
         </DetailListTitle>
         <DetailListDescription>
@@ -109,7 +77,7 @@ export function Use() {
           need.
         </DetailListDescription>
         <DetailListTitle>
-          <Component className="h-4 w-4" />
+          <Component />
           Component-only
         </DetailListTitle>
         <DetailListDescription>
@@ -119,7 +87,7 @@ export function Use() {
           instead.
         </DetailListDescription>
         <DetailListTitle>
-          <Split className="h-4 w-4" />
+          <Split />
           Optimized subscriptions
         </DetailListTitle>
         <DetailListDescription>

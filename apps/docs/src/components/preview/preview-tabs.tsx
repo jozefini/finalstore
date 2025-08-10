@@ -9,11 +9,13 @@ export function PreviewTabs({
   align = 'center',
   hideCode = false,
   component,
+  autoHeight = false,
   source,
   ...props
 }: React.ComponentProps<'div'> & {
   align?: 'center' | 'start' | 'end';
   hideCode?: boolean;
+  autoHeight?: boolean;
   component: React.ReactNode;
   source: React.ReactNode;
 }) {
@@ -63,7 +65,7 @@ export function PreviewTabs({
           <div
             data-align={align}
             className={cn(
-              'preview flex h-[450px] w-full justify-center p-10 data-[align=start]:items-start data-[align=end]:items-end data-[align=center]:items-center'
+              `preview flex ${!autoHeight ? 'h-[450px]' : 'min-h-[200px]'} w-full justify-center p-10 data-[align=start]:items-start data-[align=end]:items-end data-[align=center]:items-center`
             )}
           >
             {component}

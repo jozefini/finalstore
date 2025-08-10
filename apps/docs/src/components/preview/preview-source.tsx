@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 import { CopyButton } from './copy-button';
 import { highlightCode } from './highlight-code';
@@ -9,11 +10,13 @@ import { highlightCode } from './highlight-code';
 export function PreviewSource({
   code,
   language = 'tsx',
-  title
+  title,
+  autoHeight = false
 }: {
   code: string;
   language?: string;
   title?: string;
+  autoHeight?: boolean;
 }) {
   const [highlightedCode, setHighlightedCode] = useState<string>('');
 
@@ -45,7 +48,7 @@ export function PreviewSource({
         </figcaption>
       )}
       <CopyButton value={code} />
-      <ScrollArea className="h-[450px]">
+      <ScrollArea className={cn(!autoHeight ? 'h-[450px]' : '')}>
         <div className="relative px-3 [&_pre]:text-sm">
           {highlightedCode ? (
             <div dangerouslySetInnerHTML={{ __html: highlightedCode }} />

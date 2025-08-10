@@ -7,43 +7,105 @@ import {
 } from '@/components/ui/detail-list';
 import { Headline } from '@/components/ui/headline';
 import { Section } from '@/components/ui/section';
+import { Activity, Circle, Search } from 'lucide-react';
 
-const code = `// Import
-import { createStore } from 'finalstore';
+const setupCode = `import { createStore } from 'finalstore';
 
 // Types
 type States = {
-  count: number;
-}
+  items: { id: string; name: string; price: number; quantity: number }[];
+  loading: boolean;
+};
 type Actions = {
-  increment: (amount: number) => void;
-  decrement: (amount: number) => void;
-}
+  addItem: (item: States['items'][number]) => void;
+  removeItem: (id: string) => void;
+  clearCart: () => void;
+  fetchCart: () => Promise<void>;
+};
 type Selectors = {
-  isEven: () => boolean;
-}
+  totalItems: () => number;
+  totalPrice: () => number;
+  isLoading: () => boolean;
+};
 
-// Instance
-export const Store = createStore<States, Actions, Selectors>({
+// Store
+export const Cart = createStore<States, Actions, Selectors>({
   states: {
-    count: 0,
+    items: [],
+    loading: false,
   },
-  actions: ({ set }) => ({
-    increment: (amount: number) => {
-      set((states) => {
-        states.count += amount;
+
+  actions: ({ set, notify, clearCache }) => ({
+    addItem: (item) => {
+      set((state) => {
+        const existing = state.items.find((i) => i.id === item.id);
+        if (existing) {
+          existing.quantity += item.quantity;
+        } else {
+          state.items.push(item);
+        }
       });
+
+      // Clear cache because cart totals depend on 'items'
+      clearCache(['totalItems', 'totalPrice']);
     },
-    decrement: (amount: number) => {
-      set((states) => {
-        states.count -= amount;
+
+    removeItem: (id) => {
+      set((state) => {
+        state.items = state.items.filter((i) => i.id !== id);
       });
+
+      // Again, totals are outdated, so clear them
+      clearCache(['totalItems', 'totalPrice']);
+    },
+
+    clearCart: () => {
+      set((state) => {
+        state.items = [];
+      });
+
+      // Totals will be 0 after clearing, so refresh them
+      clearCache(['totalItems', 'totalPrice']);
+    },
+
+    fetchCart: async () => {
+      set((state) => {
+        state.loading = true;
+      });
+
+      notify(); // Show loading in UI immediately
+
+      const cartData = await fakeApi.getCart();
+
+      set((state) => {
+        state.items = cartData;
+        state.loading = false;
+      });
+
+      // Fetched data changes items, so recalc totals
+      clearCache(['totalItems', 'totalPrice']);
     },
   }),
-  selectors: ({ get }) => ({
-    isEven: () => {
-      return get('count') % 2 === 0;
-    },
+
+  selectors: ({ get, cache }) => ({
+    // Cache this because it's a computed value from 'items'
+    // and can be expensive to calculate if 'items' grows large
+    totalItems: cache(() =>
+      get().items.reduce((sum, item) => sum + item.quantity, 0)
+    ),
+
+    // Also cache this — involves iterating over 'items' and multiplying
+    // so caching avoids unnecessary recalculation
+    totalPrice: cache(() =>
+      get().items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      )
+    ),
+
+    // No cache here — this is a cheap, single-property access
+    // and always reflects the latest loading state instantly
+    isLoading: () => get().loading,
   }),
 });
 `;
@@ -54,22 +116,15 @@ export function Setup() {
       <Headline id="store-setup">Getting started</Headline>
 
       <Description>
-        First things first, make a store. Everything else hangs off it, so let's
-        get that sorted before we move on.
+        First things first, make a store. Everything else hangs off it, so
+        let&apos;s get that sorted before we move on.
       </Description>
 
-      <Preview code={code} />
+      <Preview code={setupCode} autoHeight />
 
       <DetailList>
         <DetailListTitle>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-          </svg>
+          <Circle />
           States
         </DetailListTitle>
         <DetailListDescription>
@@ -77,41 +132,15 @@ export function Setup() {
           always in sync.
         </DetailListDescription>
         <DetailListTitle>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M14 4a2 2 0 0 1 2-2" />
-            <path d="M16 10a2 2 0 0 1-2-2" />
-            <path d="M20 2a2 2 0 0 1 2 2" />
-            <path d="M22 8a2 2 0 0 1-2 2" />
-            <path d="m3 7 3 3 3-3" />
-            <path d="M6 10V5a3 3 0 0 1 3-3h1" />
-            <rect x="2" y="14" width="8" height="8" rx="2" />
-          </svg>
+          <Activity />
           Actions
         </DetailListTitle>
         <DetailListDescription>
-          Functions that update your store's state, the only way it should
+          Functions that update your store&apos;s state, the only way it should
           change.
         </DetailListDescription>
         <DetailListTitle>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="M21 21l-4.35-4.35" />
-          </svg>
+          <Search />
           Selectors
         </DetailListTitle>
         <DetailListDescription>

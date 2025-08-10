@@ -19,7 +19,7 @@ type NavGroup = {
   links: Array<{ title: string; href: string }>;
 };
 
-const withKey = `<code>key</code>`;
+// const withKey = `<code>key</code>`;
 const navGroups: NavGroup[] = [
   {
     title: 'Object Store',
@@ -28,21 +28,7 @@ const navGroups: NavGroup[] = [
       { title: 'get', href: '#store-get' },
       { title: 'use', href: '#store-use' },
       { title: 'dispatch', href: '#store-dispatch' },
-      { title: 'batch', href: '#store-batch' },
-      { title: 'on', href: '#store-on' },
-      { title: 'reset', href: '#store-reset' }
-    ]
-  },
-  {
-    title: 'Map Store',
-    links: [
-      { title: `get ${withKey}`, href: '#map-key-get' },
-      { title: `use ${withKey}`, href: '#map-key-use' },
-      { title: `dispatch ${withKey}`, href: '#map-key-dispatch' },
-      { title: `on ${withKey}`, href: '#map-key-on' },
-      { title: 'getKeys', href: '#map-get-keys' },
-      { title: 'useKeys', href: '#map-use-keys' },
-      { title: 'reset', href: '#map-reset' }
+      { title: 'batch', href: '#store-batch' }
     ]
   }
 ];

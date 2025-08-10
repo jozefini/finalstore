@@ -20,7 +20,7 @@ export function DetailListDescription({
   children: React.ReactNode;
 }) {
   return (
-    <dd className="[&_code]:bg-muted mt-1 text-sm leading-relaxed text-neutral-200 [&_code]:mx-1 [&_code]:rounded-sm [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-sm [&_code]:font-medium [&_code]:text-neutral-400">
+    <dd className="[&_code]:bg-muted [&_code]:text- mt-1 text-sm leading-relaxed text-neutral-200 [&_code]:mx-1 [&_code]:rounded-sm [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:font-medium [&_code]:text-neutral-400">
       {children}
     </dd>
   );
